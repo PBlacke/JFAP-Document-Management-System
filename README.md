@@ -1,17 +1,14 @@
+Simple Document Management System (DMS) Prototype for JFAP Constructions
+A lightweight web‑based application that allows users to upload scanned documents (images or PDFs), automatically extract text using Optical Character Recognition (OCR), and search through the contents. Built with Flask, SQLite, and Tesseract, this prototype demonstrates core DMS functionality in a clean, self‑contained package.
+
 ✨ Features
-📤 Upload documents – Supports PNG, JPG, JPEG, GIF, and PDF files.
-
-🔍 OCR text extraction – Uses Tesseract to read text from images and multi‑page PDFs.
-
-💾 Store metadata – Saves filename, file path, extracted text, and upload date in an SQLite database.
-
-🔎 Full‑text search – Search for any word or phrase inside the uploaded documents.
-
-🖱️ Clickable results – Search results and document list entries link directly to the original file for viewing.
-
-🕒 Local timestamps – Upload times are stored using the system’s local time (e.g., Philippine Time).
-
-🖥️ Clean, responsive interface – Simple HTML/CSS/JavaScript frontend with a custom favicon.
+ Upload documents – Supports PNG, JPG, JPEG, GIF, and PDF files.
+ OCR text extraction – Uses Tesseract to read text from images and multi‑page PDFs.
+ Store metadata – Saves filename, file path, extracted text, and upload date in an SQLite database.
+ Full‑text search – Search for any word or phrase inside the uploaded documents.
+ Clickable results – Search results and document list entries link directly to the original file for viewing.
+ Local timestamps – Upload times are stored using the system’s local time (e.g., Philippine Time).
+ Clean, responsive interface – Simple HTML/CSS/JavaScript frontend with a custom favicon.
 
 🛠️ Tech Stack
 Component	Technology
@@ -94,13 +91,19 @@ Click “View All Documents” in the navigation bar to see a list of all upload
 During development, several modifications were implemented to enhance functionality and fix issues:
 
 Change	Description	Rationale
-Favicon fix	Moved fav.png to a static/ folder and used url_for('static', filename='fav.png') in the HTML templates.	Flask does not serve files from the root by default; the static folder is the correct location.
-Document viewing	Added /view/<int:doc_id> route that serves the file from the uploads folder.	Allows users to click on search results or document list entries to view the actual document.
-Tuple bug in SQL query	Corrected (doc_id) to (doc_id,) in the view_document route.	SQLite expects a tuple of parameters; a single value without a comma is not a tuple.
+Favicon fix
+Moved fav.png to a static/ folder and used url_for('static', filename='fav.png') in the HTML templates.	Flask does not serve files from the root by default; the static folder is the correct location.
+Document viewing	
+Added /view/<int:doc_id> route that serves the file from the uploads folder.	Allows users to click on search results or document list entries to view the actual document.
+Tuple bug in SQL query	
+Corrected (doc_id) to (doc_id,) in the view_document route.	SQLite expects a tuple of parameters; a single value without a comma is not a tuple.
 os.path.exists typo	Changed os.path.exist(filepath) to os.path.exists(filepath).	The correct method name is exists (with an 's').
-Local timestamps (Philippine Time)	Replaced SQLite’s CURRENT_TIMESTAMP (UTC) with datetime.now().strftime('%Y-%m-%d %H:%M:%S') in the upload_file route.	Ensures upload times reflect the local timezone (e.g., Philippine Time).
-Date format for Windows	Changed '%Y-%-m-%d %H:%M:%S' to '%Y-%m-%d %H:%M:%S' because the %- modifier is not supported on Windows.	Prevents a ValueError that would cause the upload to fail and return an HTML error page.
-Visual polish	Updated button and link colours to a consistent shade of blue (#415f97).	Improves the user interface and brand consistency.
+Local timestamps (Philippine Time)	
+Replaced SQLite’s CURRENT_TIMESTAMP (UTC) with datetime.now().strftime('%Y-%m-%d %H:%M:%S') in the upload_file route.	Ensures upload times reflect the local timezone (e.g., Philippine Time).
+Date format for Windows	
+Changed '%Y-%-m-%d %H:%M:%S' to '%Y-%m-%d %H:%M:%S' because the %- modifier is not supported on Windows.	Prevents a ValueError that would cause the upload to fail and return an HTML error page.
+Visual polish	
+Updated button and link colours to a consistent shade of blue (#415f97).	Improves the user interface and brand consistency.
 🗄️ Project Structure
 text
 dms_prototype/
