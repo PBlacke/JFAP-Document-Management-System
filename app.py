@@ -78,7 +78,7 @@ def upload_file():
         extracted_text = extract_text_from_file(filepath)
 
         #get system current timee
-        upload_time = datetime.now().strftime('%Y-%-m-%d %H:%M:%S')
+        upload_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         #save to database
         conn = sqlite3.connect('documents.db')
