@@ -6,6 +6,7 @@ import pytesseract
 from PIL import Image
 import pdf2image
 import tempfile
+from flask import send_from_directory, abort
 
 app = Flask(__name__)
 
@@ -72,10 +73,10 @@ def upload_file():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-        # OCR text extract
+        #OCR text extract
         extracted_text = extract_text_from_file(filepath)
 
-        # Save to database
+        #save to database
         conn = sqlite3.connect('documents.db')
         c = conn.cursor()
         c.execute("INSERT INTO documents (filename, filepath, extracted_text) VALUES (?, ?, ?)",
@@ -120,6 +121,27 @@ def list_documents():
     docs = c.fetchall()
     conn.close()
     return render_template('documents.html', documents=docs)
+
+#view route
+@app.route('/view/<int:doc_id>')
+def view_document(doc_id):
+    conn = sqlite3.connect('documents.db')
+    c = conn.cursor()
+    c.execute("SELECT filepath FROM documents WHERE id = ?", (doc_id,))
+    row =c.fetchone()
+    conn.close()
+
+    if row is None:
+        abort(404)  #document not found
+
+    filepath = row[0]
+
+    #security check: ensure that file exist and is inside the uploads folder
+    if not os.path.exists(filepath):
+        abort(404)
+
+    #serve file
+    return send_from_directory(os.path.dirname(filepath), os.path.basename(filepath))
 
 if __name__ == '__main__':
     app.run(debug=True)

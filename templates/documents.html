@@ -4,15 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>All Documents - DMS Prototype</title>
+    <link rel="icon" href="{{ url_for('static', filename='fav.png') }}" type="image/png">
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 20px; }
         .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { color: #333; margin-bottom: 30px; }
         .nav-links { margin-bottom: 20px; }
-        .nav-links a { color: #4CAF50; text-decoration: none; margin-right: 20px; }
+        .nav-links a { color: #415f97; text-decoration: none; margin-right: 20px; }
         .nav-links a:hover { text-decoration: underline; }
-        .doc-item { background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4CAF50; }
+        .doc-item { background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4553a0; }
         .filename { font-weight: bold; color: #333; }
         .date { color: #666; font-size: 14px; margin-top: 5px; }
         .no-docs { color: #666; text-align: center; padding: 40px; }
@@ -30,14 +32,14 @@
         {% if documents %}
             {% for doc in documents %}
             <div class="doc-item">
-                <div class="filename">{{ doc[1] }}</div>
+                <div class="filename"><a href="/view/{{ doc[0] }}" target="_blank">📄 {{ doc[1] }}</a></div>
                 <div class="date">Uploaded: {{ doc[2] }}</div>
             </div>
             {% endfor %}
         {% else %}
             <div class="no-docs">
                 <p>No documents uploaded yet.</p>
-                <p><a href="/" style="color: #4CAF50;">Upload your first document!</a></p>
+                <p><a href="/" style="color: #415f97;">Upload your first document!</a></p>
             </div>
         {% endif %}
     </div>

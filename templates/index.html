@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JFAP DMS Prototype</title>
-    <link rel="icon" href="/fav.png" type="image/x-icon">
+    <link rel="icon" href="{{ url_for('static', filename='fav.png') }}" type="image/png">
 
  <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -125,7 +125,7 @@
                 } else {
                     resultsDiv.innerHTML = '<h3>Search Results:</h3>' + results.map(doc => `
                         <div class="result-item">
-                            <div class="filename">📄 ${doc.filename}</div>
+                            <div class="filename"><a href="/view/${doc.id}" target="_blank">📄 ${doc.filename}</a></div>
                             <div class="snippet">${doc.snippet}</div>
                         </div>
                     `).join('');
