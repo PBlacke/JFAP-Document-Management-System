@@ -7,6 +7,7 @@ from PIL import Image
 import pdf2image
 import tempfile
 from flask import send_from_directory, abort
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -76,11 +77,14 @@ def upload_file():
         #OCR text extract
         extracted_text = extract_text_from_file(filepath)
 
+        #get system current timee
+        upload_time = datetime.now().strftime('%Y-%-m-%d %H:%M:%S')
+
         #save to database
         conn = sqlite3.connect('documents.db')
         c = conn.cursor()
-        c.execute("INSERT INTO documents (filename, filepath, extracted_text) VALUES (?, ?, ?)",
-                  (filename, filepath, extracted_text))
+        c.execute("""INSERT INTO documents (filename, filepath, extracted_text, upload_date) VALUES (?, ?, ?, ?)""",
+                  (filename, filepath, extracted_text, upload_time))
         conn.commit()
         doc_id = c.lastrowid
         conn.close()
