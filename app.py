@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, redirect, request, render_template, jsonify, url_for
 from werkzeug.utils import secure_filename
 import pytesseract
 from PIL import Image
@@ -126,7 +126,7 @@ def list_documents():
     conn.close()
     return render_template('documents.html', documents=docs)
 
-#view route
+#view document
 @app.route('/view/<int:doc_id>')
 def view_document(doc_id):
     conn = sqlite3.connect('documents.db')
@@ -146,6 +146,115 @@ def view_document(doc_id):
 
     #serve file
     return send_from_directory(os.path.dirname(filepath), os.path.basename(filepath))
+
+#preview document 
+@app.route('/preview/<int:doc_id>')
+def preview_document(doc_id):
+    conn = sqlite3.connect('documents.db')
+    c = conn.cursor()
+    c.execute("SELECT filename, filepath FROM documents WHERE id = ?", (doc_id,))
+    row = c.fetchone()
+    conn.close()
+
+    if row is None:
+        abort(404)
+
+    filename, filepath = row
+
+    #determine file type
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+
+    if ext in ['png', 'jpg', 'jpeg', 'gif']:
+        #for img -> img tag
+        return render_template('preview_image.html', filename=filename, filepath=filepath, doc_id=doc_id)
+    elif ext == 'pdf':
+        #for pdf -> embed
+        return render_template('preview_pdf.html', filename=filename, filepath=filepath, doc_id=doc_id)
+    else:
+        #other file
+        return redirect(url_for('view_document', doc_id=doc_id))
+
+#edit document
+@app.route('/edit/<int:doc_id>', methods=['GET', 'POST'])
+def edit_document(doc_id):
+    conn = sqlite3.connect('documents.db')
+    c = conn.cursor()
+
+    if request.method == 'POST':
+        new_filename = request.form['filename'].strip()
+        if not new_filename:
+            return "Filename can't be empty", 400
+        
+        #get current file info
+        c.execute("SELECT filename, filepath FROM documents WHERE id = ?", (doc_id,))
+        row = c.fetchone()
+        if not row:
+            abort(404)
+        old_filename, old_filepath = row
+
+        #determine new filename 
+        ext = old_filename.rsplit('.', 1)[-1] if '.' in old_filename else ''
+        if not new_filename.endswith('.' + ext):
+            new_filename = new_filename + '.' + ext
+        new_filepath = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+
+        #rename file
+        try:
+            os.rename(old_filepath, new_filepath)
+        except Exception as e:
+            return f"Errror renaming file: {str(e)}", 500
+
+        #update database
+        c.execute("UPDATE documents SET filename = ?, filepath = ? WHERE id = ?",
+                  (new_filename, new_filepath, doc_id))
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for('list_documents'))
+    
+    else: #GET request - show edit form
+        c.execute("SELECT filename FROM documents WHERE id = ?", (doc_id,))
+        row = c.fetchone()
+        conn.close()
+
+        if not row:
+            abort(404)
+        filename = row[0]
+        #strip extension for display
+        name_without_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
+
+        return render_template('edit.html', doc_id=doc_id, filename=name_without_ext)
+
+#delete document
+@app.route('/delete/<int:doc_id>', methods=['POST'])
+def delete_document(doc_id):
+    conn = sqlite3.connect('documents.db')
+    c = conn.cursor()
+
+    #get filepath
+    c.execute("SELECT filepath FROM documents WHERE id = ?", (doc_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        abort(404)
+
+    filepath = row[0]
+
+    #delete from database
+    c.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    conn.commit()
+    conn.close()
+
+    #delete file from disk
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    except Exception as e:
+        #log error, L file not so skibidi sigma 
+        print(f"L deleting file {filepath}: {e}")
+
+    return redirect(url_for('list_documents'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)

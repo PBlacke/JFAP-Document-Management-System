@@ -104,7 +104,7 @@
             }
         }
         
-        // Search functionality
+       // Search functionality
         let searchTimeout;
         document.getElementById('searchInput').addEventListener('input', function(e) {
             clearTimeout(searchTimeout);
@@ -125,14 +125,15 @@
                 } else {
                     resultsDiv.innerHTML = '<h3>Search Results:</h3>' + results.map(doc => `
                         <div class="result-item">
-                            <div class="filename"><a href="/view/${doc.id}" target="_blank">📄 ${doc.filename}</a></div>
+                            <div class="filename"><a href="/preview/${doc.id}" target="_blank">📄 ${doc.filename}</a></div>
                             <div class="snippet">${doc.snippet}</div>
                         </div>
                     `).join('');
                 }
-            }, 500); // Wait 500ms after typing stops
+            }, 500);
         });
-    </script>
+
+</script>
 
 
 

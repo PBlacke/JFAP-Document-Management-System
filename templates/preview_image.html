@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview: {{ filename }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='fav.png') }}" type="image/png">
+    <style>
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; text-align: center; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; }
+        .nav { margin-bottom: 20px; }
+        .nav a { color: #415f97; text-decoration: none; margin: 0 10px; }
+    </style>
+</head>
+
+<body>
+      <div class="container">
+        <div class="nav">
+            <a href="/">Home</a> |
+            <a href="/documents">All Documents</a> |
+            <a href="{{ url_for('view_document', doc_id=doc_id) }}" target="_blank">Download Original</a>
+        </div>
+        <h2>{{ filename }}</h2>
+        <img src="{{ url_for('view_document', doc_id=doc_id) }}" alt="{{ filename }}">
+    </div>
+</body>
+</html>
