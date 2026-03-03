@@ -31,6 +31,16 @@ def init_db():
                   filepath TEXT,
                   extracted_text TEXT,
                   upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
+    #add new columns doc_type and project   
+    try:
+        c.execute("ALTER TABLE documents ADD COLUMN doc_type TEXT")
+    except sqlite3.OperationalError:    
+        pass
+    try:
+        c.execute("ALTER TABLE documents ADD COLUMN project TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -77,14 +87,19 @@ def upload_file():
         #OCR text extract
         extracted_text = extract_text_from_file(filepath)
 
+        #get form data
+        doc_type = request.form.get('type', '')
+        project = request.form.get('project', '')
+
         #get system current timee
         upload_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         #save to database
         conn = sqlite3.connect('documents.db')
         c = conn.cursor()
-        c.execute("""INSERT INTO documents (filename, filepath, extracted_text, upload_date) VALUES (?, ?, ?, ?)""",
-                  (filename, filepath, extracted_text, upload_time))
+        c.execute("""INSERT INTO documents (filename, filepath, extracted_text, upload_date, doc_type, project) 
+                  VALUES (?, ?, ?, ?, ?, ?)""",
+                  (filename, filepath, extracted_text, upload_time, doc_type, project))
         conn.commit()
         doc_id = c.lastrowid
         conn.close()
@@ -121,7 +136,7 @@ def search():
 def list_documents():
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
-    c.execute("SELECT id, filename, upload_date FROM documents ORDER BY upload_date DESC")
+    c.execute("SELECT id, filename, upload_date, doc_type, project FROM documents ORDER BY upload_date DESC")
     docs = c.fetchall()
     conn.close()
     return render_template('documents.html', documents=docs)
@@ -175,55 +190,46 @@ def preview_document(doc_id):
         return redirect(url_for('view_document', doc_id=doc_id))
 
 #edit document
-@app.route('/edit/<int:doc_id>', methods=['GET', 'POST'])
+@app.route('/edit/<int:doc_id>', methods=['POST'])
 def edit_document(doc_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
 
-    if request.method == 'POST':
-        new_filename = request.form['filename'].strip()
-        if not new_filename:
-            return "Filename can't be empty", 400
-        
-        #get current file info
-        c.execute("SELECT filename, filepath FROM documents WHERE id = ?", (doc_id,))
-        row = c.fetchone()
-        if not row:
-            abort(404)
-        old_filename, old_filepath = row
+    new_filename = request.form['filename'].strip()
+    doc_type = request.form.get('type', '')
+    project = request.form.get('project', '')
 
-        #determine new filename 
-        ext = old_filename.rsplit('.', 1)[-1] if '.' in old_filename else ''
-        if not new_filename.endswith('.' + ext):
-            new_filename = new_filename + '.' + ext
-        new_filepath = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+    if not new_filename:
+        return "Filename can't be empty", 400
 
-        #rename file
-        try:
-            os.rename(old_filepath, new_filepath)
-        except Exception as e:
-            return f"Errror renaming file: {str(e)}", 500
+    # Get current file info
+    c.execute("SELECT filename, filepath FROM documents WHERE id = ?", (doc_id,))
+    row = c.fetchone()
+    if not row:
+        abort(404)
+    old_filename, old_filepath = row
 
-        #update database
-        c.execute("UPDATE documents SET filename = ?, filepath = ? WHERE id = ?",
-                  (new_filename, new_filepath, doc_id))
-        conn.commit()
-        conn.close()
+    # Determine new filename with extension
+    ext = old_filename.rsplit('.', 1)[-1] if '.' in old_filename else ''
+    if not new_filename.endswith('.' + ext):
+        new_filename = new_filename + '.' + ext
+    new_filepath = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
 
-        return redirect(url_for('list_documents'))
-    
-    else: #GET request - show edit form
-        c.execute("SELECT filename FROM documents WHERE id = ?", (doc_id,))
-        row = c.fetchone()
-        conn.close()
+    # Rename file on disk
+    try:
+        os.rename(old_filepath, new_filepath)
+    except Exception as e:
+        return f"Error renaming file: {str(e)}", 500
 
-        if not row:
-            abort(404)
-        filename = row[0]
-        #strip extension for display
-        name_without_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
+    # Update database
+    c.execute("""UPDATE documents 
+                 SET filename = ?, filepath = ?, doc_type = ?, project = ? 
+                 WHERE id = ?""",
+              (new_filename, new_filepath, doc_type, project, doc_id))
+    conn.commit()
+    conn.close()
 
-        return render_template('edit.html', doc_id=doc_id, filename=name_without_ext)
+    return redirect(url_for('list_documents'))
 
 #delete document
 @app.route('/delete/<int:doc_id>', methods=['POST'])

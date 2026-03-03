@@ -28,9 +28,15 @@
         .close:hover { color: black;}
         .modal h2 { margin-top: 0; color: #333;}
         .modal label { display: block; margin: 15px 0 5px;}
-        .modal input[type="text"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;}
+        .modal input[type="text"], .modal select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;}
         .modal button { background: #415f97; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 15px;}
         .modal button:hover { background: #2c3e6b;}
+        
+        /*delete*/
+        #deleteBtn { background: #c00;}
+        #deleteBtn:hover { background: #a00;}
+        .doc-meta { font-size: 0.85em; color: #666; margin-top: 5px;}
+        .doc-meta span { margin-right: 15px;}
     </style>
 </head>
 <body>
@@ -44,17 +50,20 @@
         
         {% if documents %}
             {% for doc in documents %}
-            <div class="doc-item">
+            <div class="doc-item" data-id="{{ doc[0] }}" data-filename="{{ doc[1] }}" data-type="{{ doc[3] if doc[3] else '' }}" data-project="{{ doc[4] if doc[4] else '' }}" data-ext="{{ doc[1].split('.')[-1] }}">
                 <div class="filename">
                     <a href="/preview/{{ doc[0] }}" target="_blank">📄 {{ doc[1] }}</a>
                     <span style="float: right;">
                         <!--Edit-->
-                        <button onclick="openEditModal('{{ doc[0] }}', '{{ doc[1] }}')" style="background: none; border: none; cursor: pointer; text-decoration: none; margin-right: 10px;"><img src="{{ url_for('static', filename='edit-text.png') }}" alt="edit"></button>
-                        <!--Delete-->
-                        <form action="/delete/{{ doc[0] }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this document?');">
-                            <button type="submit" style="background: none; border: none; cursor: pointer; text-decoration: none;"><img src="{{ url_for('static', filename='trash.png') }}" alt="delete"></button>
-                        </form>
+                        <button onclick="openEditModal('{{ doc[0] }}')" style="background: none; border: none; cursor: pointer; text-decoration: none; margin-right: 10px;">
+                            <img src="{{ url_for('static', filename='edit-text.png') }}" alt="edit">
+                        </button>
+
                     </span>
+                </div>
+                <div class="doc-meta">
+                    <span>Type: {{ doc[3] if doc[3] else 'Not set' }}</span>
+                    <span>Project: {{ doc[4] if doc[4] else 'Not set' }}</span>
                 </div>
                 <div class="date">Uploaded: {{ doc[2] }}</div>
             </div>
@@ -72,45 +81,92 @@
         <div class="modal-content">
             <span class="close">&times;</span>
             <h2>Edit Document</h2>
+            <div id="preview-area" style="text-align: center; margin-bottom: 15px;">
+                <!-- Preview will be inserted here by JavaScript -->
+            </div>
+
             <form id="editForm" method="POST" action="">
                 <label for="edit-filename">Filename (without extension):</label>
                 <input type="text" id="edit-filename" name="filename" required>
-                <p style="color: #666; font-size: 0.9em;">The file extension will be preserved automatically.</p>
+
+                <label for="edit-type">Document Type:</label>
+                <select name="type" id="edit-type">
+                    <option value="">--Select---</option>
+                    <option value="PR">Purchase Request</option>
+                    <option value="PO">Purchase Order</option>
+                    <option value="Other">Other</option>
+                </select>
+
+                <label for="edit-project">Project:</label>
+                <input type="text" id="edit-project" name="project" placeholder="Project Name">
                 <button type="submit">Save Changes</button>
+            </form>
+            <hr>
+            <form id="deleteForm" method="POST" onsubmit="return confirm('Are you sure you want to delete this document?');">
+                <button type="submit" id="deleteBtn">Delete Document</button>
             </form>
         </div>
     </div>
 
     <script>
-        // Get modal elements
-        const modal = document.getElementById('editModal');
-        const closeBtn = document.querySelector('.close');
-        const editForm = document.getElementById('editForm');
-        const editFilenameInput = document.getElementById('edit-filename');
+    // Get modal elements
+    const modal = document.getElementById('editModal');
+    const closeBtn = document.querySelector('.close');
+    const editForm = document.getElementById('editForm');
+    const deleteForm = document.getElementById('deleteForm');
+    const editFilenameInput = document.getElementById('edit-filename');
+    const editTypeSelect = document.getElementById('edit-type');
+    const editProjectInput = document.getElementById('edit-project');
+    const previewArea = document.getElementById('preview-area');
 
-        // Close modal when clicking the X or outside the modal
-        closeBtn.onclick = function() {
+    // Close modal when clicking X or outside
+    closeBtn.onclick = function() {
+        modal.style.display = 'none';
+    }
+    window.onclick = function(event) {
+        if (event.target == modal) {
             modal.style.display = 'none';
         }
+    }
 
-        window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
+    // Function to open modal and populate fields
+    function openEditModal(docId) {
+        // Find the document item by data-id
+        const docItem = document.querySelector(`.doc-item[data-id="${docId}"]`);
+        if (!docItem) return;
+
+        // Extract data from dataset
+        const filename = docItem.dataset.filename;
+        const docType = docItem.dataset.type || '';
+        const project = docItem.dataset.project || '';
+        const fileExt = docItem.dataset.ext;
+
+        // Set filename without extension
+        const nameWithoutExt = filename.includes('.') ? filename.substring(0, filename.lastIndexOf('.')) : filename;
+        editFilenameInput.value = nameWithoutExt;
+
+        // Set type and project
+        editTypeSelect.value = docType;
+        editProjectInput.value = project;
+
+        // Set form actions
+        editForm.action = `/edit/${docId}`;
+        deleteForm.action = `/delete/${docId}`;
+
+        // Set preview
+        if (fileExt.match(/(png|jpg|jpeg|gif)/i)) {
+            previewArea.innerHTML = `<img src="/view/${docId}" alt="Preview" style="max-width: 200px; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">`;
+        } else if (fileExt.match(/pdf/i)) {
+            // Use a PDF icon if you have one in static/
+            previewArea.innerHTML = `<img src="{{ url_for('static', filename='pdf-icon.png') }}" alt="PDF" style="width: 64px; height: 64px;"><p>PDF Document</p>`;
+        } else {
+            previewArea.innerHTML = `<p>No preview available</p>`;
         }
 
-        // Function to open edit modal and set its action
-        function openEditModal(docId, currentFilename) {
-            // Remove file extension for display
-            const nameWithoutExt = currentFilename.includes('.') 
-                ? currentFilename.substring(0, currentFilename.lastIndexOf('.')) 
-                : currentFilename;
-            
-            editFilenameInput.value = nameWithoutExt;
-            editForm.action = `/edit/${docId}`;
-            modal.style.display = 'block';
-        }
-    </script>
+        // Show modal
+        modal.style.display = 'block';
+    }
+</script>
 </body>
 
 </html>
