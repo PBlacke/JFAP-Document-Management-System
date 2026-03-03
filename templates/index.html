@@ -39,9 +39,10 @@
         <h1>JFAP Document Management System(Prototype)</h1>
 
         <!--upload-->
-        <div class="upload-area">
+        <div class="upload-area" id="drop-area">
             <h2>Upload Document</h2>
             <p>Supported Files: Images (PNG, JPG) and PDFs</p>
+            <p style="font-size: 0.9em; color: #666;">(You can also drag and drop files here)</p>
             <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.pdf">
             <br>
             <button onclick="uploadFile()">Upload & Process</button>
@@ -132,6 +133,51 @@
                 }
             }, 500);
         });
+
+        // Drag and Drop function
+        const dropArea = document.getElementById('drop-area');
+        
+        //prevent defult drag behaviors so the fucntion is ohio rizz
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop area when dragging over
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            dropArea.style.borderColor = '#415f97';
+            dropArea.style.backgroundColor = '#f0f4ff';
+        }
+
+        function unhighlight() {
+            dropArea.style.borderColor = '#ccc';
+            dropArea.style.backgroundColor = '';
+        }
+
+        // Handle dropped files
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            // Use the first file (like the file input does)
+            if (files.length > 0) {
+                document.getElementById('fileInput').files = files;
+                uploadFile(); // automatically start upload
+            }
+        }
 
 </script>
 

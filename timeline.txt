@@ -1,0 +1,46 @@
+📅 Development Timeline Journal
+Project: JFAP Simple Document Management System (DMS) Prototype
+
+
+🗓️ February 27, 2026 – Project Kickoff & Core Implementation
+Started building the prototype from scratch using Flask, SQLite, and Tesseract OCR.
+Implemented basic functionality:
+    - File upload (images and PDFs) with secure filename handling.
+    - OCR text extraction using Tesseract (via pytesseract).
+    - Storage of document metadata and extracted text in an SQLite database.
+    - Simple search using LIKE queries on the extracted text.
+    - Clean, responsive frontend with vanilla HTML/CSS/JavaScript.
+    - Set up project structure with app.py, templates/, static/, and uploads/ folders.
+    - Initialised Git repository and pushed the first working version to GitHub.
+✅ Achieved: A functional DMS that can upload, OCR, store, and search documents.
+
+
+🗓️ March 2, 2026 – Debugging, Documentation, and Preview Attempt
+Focused on refining the existing code:
+    - Fixed several typos and syntax errors (e.g., table creation, missing commas, variable name mismatches).
+    - Resolved issues with Tesseract path configuration and PDF processing.
+    - Corrected the favicon not showing by moving it to the static/ folder and using url_for.
+    - Added a comprehensive README to the GitHub repository, detailing installation, usage, and tech stack.
+    - Began implementing document preview functionality:
+    - Created /preview/<int:doc_id> route to serve images and PDFs in an embedded viewer.
+    - Added preview_image.html and preview_pdf.html templates.
+Encountered bugs: missing doc_id in template context and SQL query errors (typo in table name, missing commas in tuples).
+🐛 Challenges: Preview feature was incomplete due to template variable errors and database query issues.
+
+
+🗓️ March 3, 2026 – Feature Completion & Debugging
+Successfully debugged and completed the preview functionality:
+    - Fixed SQL queries (corrected documents table name, added missing commas in tuple parameters).
+    - Passed doc_id to the preview templates so download links work.
+    - Verified that images and PDFs display correctly.
+    Implemented edit and delete features:
+        - Edit: Added /edit/<int:doc_id> route (GET for form, POST for update) allowing users to rename documents; the actual file on disk is also renamed.
+        - Delete: Added /delete/<int:doc_id> (POST only) to remove both database record and physical file, with JavaScript confirmation.
+    Addressed all remaining bugs:
+        - Fixed sqlite3.ProgrammingError by ensuring parameters are passed as tuples (value,) not single values.
+        - Imported url_for to resolve NameError in redirects.
+        - Corrected local timestamp formatting for Windows (removed unsupported %- modifiers).
+        - Updated search result links to use /preview/ instead of Jinja placeholders.
+        - Polished the UI with consistent colour scheme and navigation links.
+Tested end-to-end: Upload, search, preview, edit, delete – all working smoothly.
+✅ Final outcome: A fully functional DMS prototype with upload, OCR, search, preview, edit, and delete capabilities, well-documented on GitHub.
