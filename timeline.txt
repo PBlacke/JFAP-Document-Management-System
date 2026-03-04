@@ -59,3 +59,29 @@ Encountered bugs: missing doc_id in template context and SQL query errors (typo 
         - Delete removes both record and file.
         - All features working smoothly.
 ✅ Final outcome: A fully functional DMS prototype with upload (with drag‑and‑drop), OCR, search, preview, inline editing modal, and delete, complete with document tagging (type/project) and a polished UI. Well‑documented on GitHub.
+
+
+🗓️ March 4, 2026 – Full‑Text Search, User Authentication, and UI Polish
+    Implemented SQLite FTS5 full‑text search:
+        - Created documents_fts virtual table linked to the main documents table.
+        - Added triggers to keep the FTS index in sync on insert, update, and delete.
+        - Replaced the old LIKE‑based search with a lightning‑fast MATCH query.
+        - Enhanced search with BM25 relevance ranking – results are now ordered by how well they match the query, then by date.
+        - Verified that searches return whole‑word matches, support phrases, and ignore stop words.
+    Added user authentication system:
+        - Installed and configured Flask‑Login.
+        - Created users table with fields for id, username (formatted as first.last), email (optional), and hashed password.
+        - Implemented password validation: minimum 8 characters, at least one number, and one special character.
+        - Built registration and login routes with proper error handling.
+        - Created styled login and registration pages matching the existing UI.
+        - Protected all document‑related routes with @login_required.
+        - Modified every database query to filter documents by current_user.id, ensuring each user sees only their own documents.
+        - Updated navigation links to show logout, username, or login/register depending on authentication state.
+    Root route behavior changed:
+        - The home page now redirects unauthenticated users to the login page; authenticated users go directly to the upload/search interface.
+    Bug fixes and refinements:
+        - Fixed SQL parameter binding errors in multiple routes (e.g., list_documents, preview_document) by ensuring correct number of placeholders and passing current_user.id.
+        - Corrected unpacking errors in preview_document – selected only the needed columns.
+        - Added ownership verification to all document‑specific endpoints (/edit, /delete, /preview, /view) to prevent cross‑user access.
+        - Tidied up the UI for login and registration with consistent styling and helpful hints.
+✅ Final outcome: The JFAP DMS Prototype now boasts multi‑user support, fast and relevant full‑text search, and a cohesive, secure experience. All core features (upload, OCR, search, preview, edit, delete) are locked to individual users. The system is ready for further enhancements like email verification or deployment.
