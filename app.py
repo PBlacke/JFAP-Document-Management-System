@@ -153,13 +153,13 @@ def search():
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
 
-    # use fts match, join back to get all feilds by ordering newest first
+    # use fts match with bm25, join back to get all feilds by ordering newest first
     c.execute('''
-              SELECT doc.id, doc.filename, doc.extracted_text
+              SELECT doc.id, doc.filename, doc.extracted_text, bm25(documents_fts) as rank
               FROM documents doc
               JOIN documents_fts fts ON doc.id = fts.rowid
               WHERE documents_fts MATCH ?
-              ORDER BY doc.upload_date DESC
+              ORDER BY rank ASC, doc.upload_date DESC
               ''', (query,))
     
     results = c.fetchall()
