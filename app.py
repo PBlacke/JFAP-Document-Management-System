@@ -8,8 +8,37 @@ import pdf2image
 import tempfile
 from flask import send_from_directory, abort
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+import re
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 
+
+#app configuration
 app = Flask(__name__)
+
+#for user class
+class User(UserMixin):
+    def __init__(self, id, username, email):
+        self.id = id
+        self.username = username
+        self.email = email
+
+#login manager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    conn = sqlite3.connect('documents.db')
+    c = conn.cursor()
+    c.execute("SELECT id, username, email FROM users WHERE id = ?", (user_id))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return User(row[0], row[1], row[2]) 
+    return None 
+
 
 # Configuration
 UPLOAD_FOLDER = "uploads"
@@ -71,11 +100,42 @@ def init_db():
                     VALUES(new.id, new.filename, new.extracted_text, new.doc_type, new.project);
                     END;
                     ''')
+    
+    #add user
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              username TEXT UNIQUE NOT NULL,
+              email TEXT,
+              password_hash TEXT NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              )''')
+    
+    try:
+        c.execute("ALTER TABLE documents ADD COLUMN user_id INTEGER REFERENCES users(id)")
+    except sqlite3.OperationalError:
+        pass    
 
     conn.commit()
     conn.close()
 
 init_db()
+
+#password validation and hashing
+def validate_password(password):
+    """Return (is_valid, error_message)"""
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one number"
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False, "Password must contain at least one special character" 
+    return True, ""
+
+def generate_username(first, last):
+    """Format first.last"""
+    first_part = first.split()[0] if first else ""
+    last_part = last.split()[-1] if last else ""
+    return f"{first_part}.{last_part}".lower()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -99,9 +159,89 @@ def extract_text_from_file(filepath):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    if current_user.is_authenticated: 
+        return render_template('index.html')
+    else:
+        return redirect(url_for('login'))
+
+
+#registration route
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        first = request.form['firstname'].strip()
+        last = request.form['lastname'].strip()
+        email = request.form.get('email', '').strip()
+        password = request.form['password']
+        confirm = request.form['confirm_password']
+
+        #basic checks
+        if not first or not last:
+            return "First and last name are required", 400
+        if password != confirm:
+            return "Passwords do not match", 400
+
+        #validate password
+        valid, msg = validate_password(password)
+        if not valid:
+            return msg, 400
+        
+        #generate username
+        username = generate_username(first, last)
+
+        #check uniqueness
+        conn = sqlite3.connect('documents.db')
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE username = ?", (username,))
+        if c.fetchone():
+            conn.close()
+            return "Username already exists. Try different name combination", 400
+
+        #hash password and insert
+        pw_hash = generate_password_hash(password)
+        c.execute("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+                  (username, email, pw_hash))
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for('login'))
+
+    return render_template('register.html')   
+
+
+#login route
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = sqlite3.connect('documents.db')
+        c = conn.cursor()
+        c.execute("SELECT id, username, email, password_hash FROM users WHERE username = ?", (username,))
+        row = c.fetchone()
+        conn.close()
+
+        if row and check_password_hash(row[3], password):
+            user = User(row[0], row[1], row[2])
+            login_user(user)
+            return redirect(url_for('index'))
+        else:
+            return "Invalid username or password", 401
+        
+    return render_template('login.html')
+
+
+#logout route
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -128,9 +268,9 @@ def upload_file():
         #save to database
         conn = sqlite3.connect('documents.db')
         c = conn.cursor()
-        c.execute("""INSERT INTO documents (filename, filepath, extracted_text, upload_date, doc_type, project) 
-                  VALUES (?, ?, ?, ?, ?, ?)""",
-                  (filename, filepath, extracted_text, upload_time, doc_type, project))
+        c.execute("""INSERT INTO documents (filename, filepath, extracted_text, upload_date, doc_type, project, user_id) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                  (filename, filepath, extracted_text, upload_time, doc_type, project, current_user.id))
         conn.commit()
         doc_id = c.lastrowid
         conn.close()
@@ -145,6 +285,7 @@ def upload_file():
     return jsonify({'error': 'File type not allowed'}), 400
 
 @app.route('/search')
+@login_required
 def search():
     query = request.args.get('q', '').strip()
     if not query or len(query) < 2:
@@ -158,9 +299,9 @@ def search():
               SELECT doc.id, doc.filename, doc.extracted_text, bm25(documents_fts) as rank
               FROM documents doc
               JOIN documents_fts fts ON doc.id = fts.rowid
-              WHERE documents_fts MATCH ?
+              WHERE documents_fts MATCH ? AND doc.user_id = ?
               ORDER BY rank ASC, doc.upload_date DESC
-              ''', (query,))
+              ''', (query, current_user.id))
     
     results = c.fetchall()
     conn.close()
@@ -172,20 +313,25 @@ def search():
     } for r in results])
 
 @app.route('/documents')
+@login_required
 def list_documents():
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
-    c.execute("SELECT id, filename, upload_date, doc_type, project FROM documents ORDER BY upload_date DESC")
+    c.execute("""SELECT id, filename, upload_date, doc_type, project 
+              FROM documents 
+              WHERE user_id = ?
+              ORDER BY upload_date DESC""", (current_user.id,))
     docs = c.fetchall()
     conn.close()
     return render_template('documents.html', documents=docs)
 
 #view document
 @app.route('/view/<int:doc_id>')
+@login_required
 def view_document(doc_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
-    c.execute("SELECT filepath FROM documents WHERE id = ?", (doc_id,))
+    c.execute("SELECT filepath FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id,))
     row =c.fetchone()
     conn.close()
 
@@ -203,10 +349,11 @@ def view_document(doc_id):
 
 #preview document 
 @app.route('/preview/<int:doc_id>')
+@login_required
 def preview_document(doc_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
-    c.execute("SELECT filename, filepath FROM documents WHERE id = ?", (doc_id,))
+    c.execute("SELECT filename, filepath FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id,))
     row = c.fetchone()
     conn.close()
 
@@ -230,6 +377,7 @@ def preview_document(doc_id):
 
 #edit document
 @app.route('/edit/<int:doc_id>', methods=['POST'])
+@login_required
 def edit_document(doc_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
@@ -242,7 +390,7 @@ def edit_document(doc_id):
         return "Filename can't be empty", 400
 
     # Get current file info
-    c.execute("SELECT filename, filepath FROM documents WHERE id = ?", (doc_id,))
+    c.execute("SELECT filename, filepath FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id))
     row = c.fetchone()
     if not row:
         abort(404)
@@ -272,12 +420,13 @@ def edit_document(doc_id):
 
 #delete document
 @app.route('/delete/<int:doc_id>', methods=['POST'])
+@login_required
 def delete_document(doc_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
 
     #get filepath
-    c.execute("SELECT filepath FROM documents WHERE id = ?", (doc_id,))
+    c.execute("SELECT filepath FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id,))
     row = c.fetchone()
     if not row:
         conn.close()
@@ -286,7 +435,7 @@ def delete_document(doc_id):
     filepath = row[0]
 
     #delete from database
-    c.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    c.execute("DELETE FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id))
     conn.commit()
     conn.close()
 
