@@ -28,19 +28,34 @@ Encountered bugs: missing doc_id in template context and SQL query errors (typo 
 🐛 Challenges: Preview feature was incomplete due to template variable errors and database query issues.
 
 
-🗓️ March 3, 2026 – Feature Completion & Debugging
-Successfully debugged and completed the preview functionality:
-    - Fixed SQL queries (corrected documents table name, added missing commas in tuple parameters).
-    - Passed doc_id to the preview templates so download links work.
-    - Verified that images and PDFs display correctly.
-    Implemented edit and delete features:
-        - Edit: Added /edit/<int:doc_id> route (GET for form, POST for update) allowing users to rename documents; the actual file on disk is also renamed.
-        - Delete: Added /delete/<int:doc_id> (POST only) to remove both database record and physical file, with JavaScript confirmation.
-    Addressed all remaining bugs:
-        - Fixed sqlite3.ProgrammingError by ensuring parameters are passed as tuples (value,) not single values.
-        - Imported url_for to resolve NameError in redirects.
-        - Corrected local timestamp formatting for Windows (removed unsupported %- modifiers).
-        - Updated search result links to use /preview/ instead of Jinja placeholders.
-        - Polished the UI with consistent colour scheme and navigation links.
-Tested end-to-end: Upload, search, preview, edit, delete – all working smoothly.
-✅ Final outcome: A fully functional DMS prototype with upload, OCR, search, preview, edit, and delete capabilities, well-documented on GitHub.
+🗓️ March 3, 2026 – Feature Completion, UI Polish, and Final Debugging
+    Enhanced upload interface:
+        - Added drag‑and‑drop support to the upload area (files are placed into the file input but not auto‑uploaded – user must click the button, maintaining consistent behaviour).
+        - Added Document Type dropdown (PR, PO, Other) and Project text field to the upload form; these are stored in the database.
+    Database schema updated:
+        - Added doc_type and project columns to the documents table (with error handling for existing columns).
+    Redesigned document editing:
+        - Replaced the separate edit.html page with a modal popup on the documents page.
+        Modal includes:
+            - A preview of the document (image thumbnail or PDF icon).
+            - Editable filename (without extension), document type dropdown, and project field.
+            - A Delete button inside the modal (with confirmation) for convenience.
+        - Updated /edit/<int:doc_id> route to handle only POST requests, updating filename, type, and project, and renaming the actual file on disk.
+        - Updated /delete/<int:doc_id> route remains POST-only.
+    Documents list enhanced:
+        - Displays type and project under each filename.
+        - Edit button (pencil icon) opens the modal; delete button (trash icon) remains inline for quick deletion (with confirmation).
+    Fixed remaining bugs:
+        - Corrected JavaScript errors in uploadFile() (moved FormData creation before appending fields).
+        - Fixed edit modal population by retrieving data from data-* attributes, ensuring type and project are correctly set.
+        - Set dynamic action for both edit and delete forms inside the modal.
+        - Resolved SQL parameter tuple issues (commas) in all database calls.
+        - Ensured url_for imported everywhere needed.
+        - Timestamp formatting now uses standard %Y-%m-%d %H:%M:%S (Windows‑compatible).
+    Tested end‑to‑end:
+        - Upload with type/project works (both manual and drag‑and‑drop).
+        - Search returns results; preview opens correct viewer.
+        - Edit modal opens with correct data, saves changes (file renamed, database updated).
+        - Delete removes both record and file.
+        - All features working smoothly.
+✅ Final outcome: A fully functional DMS prototype with upload (with drag‑and‑drop), OCR, search, preview, inline editing modal, and delete, complete with document tagging (type/project) and a polished UI. Well‑documented on GitHub.

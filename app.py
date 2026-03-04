@@ -32,15 +32,46 @@ def init_db():
                   extracted_text TEXT,
                   upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
 
-    #add new columns doc_type and project   
+    #add new columns doc_type and project, if missinf   
+    for col in ['doc_type', 'project']:
+        try:
+            c.execute(f"ALTER TABLE documents ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass    
+
+    #create fts5 virtual table, use try/except because CREATE VIRTUAL TABLE doesn't support IF NOT EXISTS
     try:
-        c.execute("ALTER TABLE documents ADD COLUMN doc_type TEXT")
-    except sqlite3.OperationalError:    
-        pass
-    try:
-        c.execute("ALTER TABLE documents ADD COLUMN project TEXT")
-    except sqlite3.OperationalError:
-        pass
+        c.execute('''CREATE VIRTUAL TABLE documents_fts USING fts5(
+                  filename,
+                  extracted_text,
+                  doc_type,
+                  project,
+                  content=documents,
+                  content_rowid=id
+                  )''')
+        print("Created FTS table")
+    except sqlite3.OperationalError as e:
+        if "already exists" in str(e):
+            print("FTS table already exists")
+        else:
+            raise e
+
+    #rebuil fts index 
+    c.execute("INSERT INTO documents_fts(documents_fts) VALUES('rebuild')")           
+
+    #triggers to keep fts in sync
+    c.executescript('''
+                    CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN INSERT INTO documents_fts(rowid, filename, extracted_text, doc_type, project)
+                    VALUES (new.id, new.filename, new.extracted_text, new.doc_type, new.project);
+                    END;
+                    CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN DELETE FROM documents_fts WHERE rowid = old.id;
+                    END;
+                    CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN DELETE FROM documents_fts WHERE rowid = old.id;
+                    INSERT INTO documents_fts(rowid, filename, extracted_text, doc_type, project)
+                    VALUES(new.id, new.filename, new.extracted_text, new.doc_type, new.project);
+                    END;
+                    ''')
+
     conn.commit()
     conn.close()
 
@@ -115,14 +146,22 @@ def upload_file():
 
 @app.route('/search')
 def search():
-    query = request.args.get('q', '')
-    if not query:
+    query = request.args.get('q', '').strip()
+    if not query or len(query) < 2:
         return jsonify([])
     
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
-    c.execute("SELECT id, filename, extracted_text FROM documents WHERE extracted_text LIKE ? ORDER BY upload_date DESC",
-              (f'%{query}%',))
+
+    # use fts match, join back to get all feilds by ordering newest first
+    c.execute('''
+              SELECT doc.id, doc.filename, doc.extracted_text
+              FROM documents doc
+              JOIN documents_fts fts ON doc.id = fts.rowid
+              WHERE documents_fts MATCH ?
+              ORDER BY doc.upload_date DESC
+              ''', (query,))
+    
     results = c.fetchall()
     conn.close()
 
