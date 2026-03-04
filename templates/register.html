@@ -5,19 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JFAP DMS Register</title>
     <link rel="icon" href="{{ url_for('static', filename='fav.png') }}" type="image/png">
-
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; margin-bottom: 30px; }
+        h2 { color: #666; margin: 20px 0; }
+        .nav-links { margin-bottom: 20px; }
+        .nav-links a { color: #415f97; text-decoration: none; margin-right: 20px; }
+        .nav-links a:hover { text-decoration: underline; }
+        form { margin-top: 20px; }
+        label { display: block; margin: 15px 0 5px; color: #333; }
+        input[type="text"], input[type="email"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .requirements {
+            font-size: 0.85em;
+            color: #666;
+            margin: 5px 0 15px;
+        }
+        button {
+            background: #415f97;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button:hover { background: #2c3e6b; }
+        p { margin-top: 20px; }
+        p a { color: #415f97; text-decoration: none; }
+        p a:hover { text-decoration: underline; }
+    </style>
 </head>
 <body>
-    <h2>Register</h2>
-    <form method="POST">
-        First Name: <input type="text" name="firstname" required><br>
-        Last Name: <input type="text" name="lastname" required><br>
-        Email (optional): <input type="email" name="email"><br>
-        Password: <input type="password" name="password" required><br>
-        Confirm Password: <input type="password" name="confirm_password" required><br>
-        <button type="submit">Register</button>
-    </form>
-    <p>Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
-    
+    <div class="container">
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('login') }}">Login</a>
+        </div>
+
+        <h2>Register</h2>
+
+        <form method="POST">
+            <label for="firstname">First Name:</label>
+            <input type="text" id="firstname" name="firstname" required>
+
+            <label for="lastname">Last Name:</label>
+            <input type="text" id="lastname" name="lastname" required>
+
+            <label for="email">Email (optional):</label>
+            <input type="email" id="email" name="email">
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            <div class="requirements">Minimum 8 characters, at least one number and one special character.</div>
+
+            <label for="confirm_password">Confirm Password:</label>
+            <input type="password" id="confirm_password" name="confirm_password" required>
+
+            <button type="submit">Register</button>
+        </form>
+
+        <p>Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+    </div>
 </body>
 </html>
