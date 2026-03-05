@@ -353,24 +353,38 @@ def view_document(doc_id):
 def preview_document(doc_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
-    c.execute("SELECT filename, filepath FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id,))
+    c.execute("""
+              SELECT d.filename, d.filepath, d.doc_type, d.project, d.upload_date, u.username
+              FROM documents d
+              JOIN users u ON d.user_id = u.id
+              WHERE d.id = ? AND d.user_id = ?
+              """, (doc_id, current_user.id,))
     row = c.fetchone()
     conn.close()
 
     if row is None:
         abort(404)
 
-    filename, filepath = row
+    filename, filepath, doc_type, project, upload_date, uploader_username = row
 
     #determine file type
     ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    template_kwargs = {
+        'doc_id': doc_id,
+        'filename': filename,
+        'filepath': filepath,
+        'doc_type': doc_type,
+        'project': project,
+        'upload_date': upload_date,
+        'uploader_username': uploader_username
+    }
 
     if ext in ['png', 'jpg', 'jpeg', 'gif']:
         #for img -> img tag
-        return render_template('preview_image.html', filename=filename, filepath=filepath, doc_id=doc_id)
+        return render_template('preview_image.html', **template_kwargs)
     elif ext == 'pdf':
         #for pdf -> embed
-        return render_template('preview_pdf.html', filename=filename, filepath=filepath, doc_id=doc_id)
+        return render_template('preview_pdf.html', **template_kwargs)
     else:
         #other file
         return redirect(url_for('view_document', doc_id=doc_id))
