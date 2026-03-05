@@ -97,6 +97,16 @@
             padding: 8px 0;
             color: #415f97;
         }
+        /* ----- Footer ----- */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            margin-top: auto;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -146,6 +156,11 @@
         {% block content %}{% endblock %}
     </main>
 
+    <footer class="footer">
+        Developed by for JFAP Construction
+        <br>
+        All rights reserved (©, 2026, Samantha Julia Donaire)
+    </footer>
     <script>
         // Simple dropdown toggle
         document.addEventListener('DOMContentLoaded', function() {
