@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}JFAP DMS{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='fav.png') }}" type="image/png">
+    <style>
+        /* ----- Global Styles (copied from your existing pages) ----- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 0; }
+        .container { max-width: 800px; margin: 20px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; margin-bottom: 30px; }
+        h2 { color: #666; margin: 20px 0; }
+        button { background: #415f97; color: white; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #2c3e6b; }
+        a { color: #415f97; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ----- Navbar Styles ----- */
+        .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .nav-left, .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .logo {
+            font-weight: bold;
+            font-size: 1.3rem;
+            color: #415f97;
+            margin-right: 30px;        
+        }
+        .logo:hover {
+            text-decoration: none;
+        }
+        .nav-left a, .nav-right a {
+            padding: 5px 0;
+            border-bottom: 2px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .nav-left a.active, .nav-right a.active {
+            border-bottom-color: #415f97;
+            font-weight: 500;
+        }
+
+        /* Profile dropdown */
+        .profile-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .profile-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background: #f0f4ff;
+        }
+        .profile-btn:hover {
+            background: #e0e8ff;
+        }
+        .profile-icon {
+            font-size: 1.2rem;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background: white;
+            min-width: 200px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            padding: 12px;
+            z-index: 1;
+        }
+        .dropdown-content.show {
+            display: block;
+        }
+        .dropdown-content hr {
+            margin: 10px 0;
+            border: none;
+            border-top: 1px solid #eee;
+        }
+        .dropdown-content a {
+            display: block;
+            padding: 8px 0;
+            color: #415f97;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="{{ url_for('index') }}" class="logo">JFAP DMS</a>
+            <a href="{{ url_for('index') }}" class="{% if active_page == 'index' %}active{% endif %}">Home</a>
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('list_documents') }}" class="{% if active_page == 'documents' %}active{% endif %}">Documents</a>
+            {% endif %}
+        </div>
+        <div class="nav-right">
+            {% if current_user.is_authenticated %}
+                <div class="profile-dropdown">
+                    <button class="profile-btn">
+                        <span class="profile-icon" style="display: inline-flex; align-items: center; gap: 5px;">
+                            <img src="{{ url_for('static', filename='user.png') }}" alt="User">
+                        </span>
+                        <span class="profile-name" style="color: #415f97;">
+                            {% set name_parts = current_user.username.split('.') %}
+                            {% if name_parts|length >= 2 %}
+                                {{ name_parts[0]|capitalize }} {{ name_parts[1]|capitalize }}
+                            {% else %}
+                                {{ current_user.username }}
+                            {% endif %}
+                        </span>
+                    </button>
+                    <div class="dropdown-content">
+                        <p><strong>{{ current_user.username }}</strong></p>
+                        <p>{{ current_user.email or 'No email provided' }}</p>
+                        <hr>
+                        <a href="{{ url_for('logout') }}" style="display: inline-flex; align-items: center; gap: 5px;">
+                            <img src="{{ url_for('static', filename='logout.png') }}" alt="User" style="height: 20px;">
+                            Logout
+                        </a>
+                    </div>
+                </div>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="{% if active_page == 'login' %}active{% endif %}">Login</a>
+                <a href="{{ url_for('register') }}" class="{% if active_page == 'register' %}active{% endif %}">Register</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        // Simple dropdown toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const profileBtn = document.querySelector('.profile-btn');
+            if (profileBtn) {
+                profileBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const dropdown = document.querySelector('.dropdown-content');
+                    dropdown.classList.toggle('show');
+                });
+            }
+            window.addEventListener('click', function() {
+                const dropdowns = document.querySelectorAll('.dropdown-content');
+                dropdowns.forEach(d => d.classList.remove('show'));
+            });
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

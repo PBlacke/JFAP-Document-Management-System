@@ -1,45 +1,29 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JFAP DMS Prototype</title>
-    <link rel="icon" href="{{ url_for('static', filename='fav.png') }}" type="image/png">
+{% extends "base.html" %}
 
+{% block title %}JFAP DMS Prototype{% endblock %}
+{% set active_page = 'index' %}
+
+{% block extra_css %}
  <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; margin-bottom: 30px; }
-        h2 { color: #666; margin: 20px 0; }
         .upload-area { border: 2px dashed #ccc; padding: 40px; text-align: center; border-radius: 10px; margin-bottom: 30px; }
         .upload-area:hover { border-color: #415f97; }
         input[type="file"] { margin: 20px 0; }
-        button { background: #415f97; color: white; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #4553a0; }
         .search-box { width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 20px; }
         .result-item { background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #415f97; }
         .filename { font-weight: bold; color: #333; }
         .snippet { color: #666; margin-top: 5px; font-size: 14px; }
         #result-text { background: #f0f0f0; padding: 15px; border-radius: 5px; margin-top: 20px; max-height: 400px; overflow-y: auto; }
-        .nav-links { margin-bottom: 20px; }
-        .nav-links a { color: #415f97; text-decoration: none; margin-right: 20px; }
-        .nav-links a:hover { text-decoration: underline; }
     </style>
 
-</head>
+{% endblock %}
 
-<body>
-    <div class="container">
-        <div class="nav-links">
-            <a href="/">Home</a>
-            <a href="/documents">View All Documents</a>
-            <a href="{{ url_for('logout') }}">Logout</a>
-        </div>
-
+{% block content %}
         <h1>JFAP Document Management System(Prototype)</h1>
 
-        <!--upload-->
+        <!--       upload
+                    >o)
+                    (_>
+        -->
         <div class="upload-area" id="drop-area">
             <h2>Upload Document</h2>
             <p>Supported Files: Images (PNG, JPG) and PDFs</p>
@@ -48,6 +32,7 @@
             <br>
             <button onclick="uploadFile()">Upload & Process</button>
             <div id="progress" style="margin-top: 10px; color: #666;"></div>
+            
             <!--TYpe, project grrr not so skibidi 67676767-->
             <div style="margin: 15px 0; text-align: left;">
                 <label for="docType">Document Type:</label>
@@ -58,10 +43,12 @@
                     <option value="Other">Other</option>
                 </select>
             </div>
+
             <div style="margin: 10px 0; text-align: left;">
                 <label for="projectName">Project:</label>
                 <input type="text" id="projectName" name="project" placeholder="Project name" style="margin-left: 10px; padding: 5px; width: 300px;">
             </div>
+
         </div>
 
         <!--search-->
@@ -71,12 +58,9 @@
 
         <!--results-->
         <div id="result-text"></div>
-    </div>
+{% endblock %}
 
-    
-
-
-
+{% block extra_js %}
 <script>
     async function uploadFile() {
         const fileInput = document.getElementById('fileInput');
@@ -127,7 +111,7 @@
         }
     }
 
-    // Search functionality (unchanged, keep as is)
+    // Search functionality
     let searchTimeout;
     document.getElementById('searchInput').addEventListener('input', function(e) {
         clearTimeout(searchTimeout);
@@ -156,7 +140,7 @@
         }, 500);
     });
 
-    // Drag & drop (unchanged, keep as is)
+    // Drag & drop
     const dropArea = document.getElementById('drop-area');
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropArea.addEventListener(eventName, preventDefaults, false);
@@ -196,9 +180,4 @@
         }
     }
 </script>
-
-
-
-</body>
-
-</html>
+{% endblock %}
