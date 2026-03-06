@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% set active_page = 'admin' %}
+
+{% block content %}
+<h1>Admin Dashboard</h1>
+
+<div style="display: flex; gap: 20px; flex-wrap: wrap;">
+    <!-- Users Section -->
+    <div style="flex: 1; min-width: 300px;">
+        <h2>Users</h2>
+        <table style="width:100%; border-collapse: collapse;">
+            <tr><th>ID</th><th>Username</th><th>Email</th><th>Admin</th><th>Created</th></tr>
+            {% for u in users %}
+            <tr>
+                <td>{{ u[0] }}</td><td>{{ u[1] }}</td><td>{{ u[2] }}</td><td>{{ 'Yes' if u[3] else 'No' }}</td><td>{{ u[4] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- Documents Section -->
+    <div style="flex: 2;">
+        <h2>All Documents</h2>
+        <table style="width:100%; border-collapse: collapse;">
+            <tr><th>ID</th><th>Filename</th><th>Type</th><th>Project</th><th>Uploaded</th><th>By</th><th>Actions</th></tr>
+            {% for d in documents %}
+            <tr>
+                <td>{{ d[0] }}</td>
+                <td>{{ d[1] }}</td>
+                <td>{{ d[2] }}</td>
+                <td>{{ d[3] }}</td>
+                <td>{{ d[4] }}</td>
+                <td>{{ d[5] }}</td>
+                <td>
+                    <a href="{{ url_for('preview_document', doc_id=d[0]) }}">Preview</a> |
+                    <a href="{{ url_for('edit_document', doc_id=d[0]) }}">Edit</a> |
+                    <form action="{{ url_for('delete_document', doc_id=d[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this document?');">
+                        <button type="submit" style="background:none; border:none; color:#c00; cursor:pointer;">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<!-- Activity Logs -->
+<div style="margin-top: 30px;">
+    <h2>Recent Activity</h2>
+    <table style="width:100%; border-collapse: collapse;">
+        <tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr>
+        {% for log in logs %}
+        <tr>
+            <td>{{ log[0] }}</td><td>{{ log[1] }}</td><td>{{ log[2] }}</td><td>{{ log[3] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<style>
+    table { border: 1px solid #ddd; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background-color: #f2f2f2; }
+</style>
+{% endblock %}

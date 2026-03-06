@@ -11,6 +11,8 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from functools import wraps
+import time
 
 
 #app configuration
@@ -18,10 +20,11 @@ app = Flask(__name__)
 
 #for user class
 class User(UserMixin):
-    def __init__(self, id, username, email):
+    def __init__(self, id, username, email, is_admin=False):
         self.id = id
         self.username = username
         self.email = email
+        self.is_admin = is_admin
 
 #login manager
 login_manager = LoginManager()
@@ -32,12 +35,30 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
-    c.execute("SELECT id, username, email FROM users WHERE id = ?", (user_id))
+    c.execute("SELECT id, username, email, is_admin FROM users WHERE id = ?", (user_id,))
     row = c.fetchone()
     conn.close()
     if row:
-        return User(row[0], row[1], row[2]) 
-    return None 
+        return User(row[0], row[1], row[2], row[3])
+    return None
+
+#admin-only decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('login'))
+        
+        #check if user is admin
+        conn = sqlite3.connect('documents.db')
+        c = conn.cursor()   
+        c.execute("SELECT is_admin FROM users WHERE id = ?", (current_user.id,))
+        row = c.fetchone()
+        conn.close()
+        if not row or row[0] != 1:
+            abort(403)  #forbidden
+        return f(*args, **kwargs)
+    return decorated_function    
 
 
 # Configuration
@@ -113,7 +134,38 @@ def init_db():
     try:
         c.execute("ALTER TABLE documents ADD COLUMN user_id INTEGER REFERENCES users(id)")
     except sqlite3.OperationalError:
-        pass    
+        pass
+
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+
+    #create activity log table
+    c.execute('''CREATE TABLE IF NOT EXISTS activity_log (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER NOT NULL,
+              action TEXT NOT NULL,
+              details TEXT,
+              timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY(user_id) REFERENCES users(id)
+              )''')
+
+    #create document versions table
+    c.execute('''CREATE TABLE IF NOT EXISTS document_versions (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              doc_id INTEGER NOT NULL,
+              version INTEGER NOT NULL,
+              filename TEXT NOT NULL,
+              filepath TEXT NOT NULL,
+              doc_type TEXT,
+              project TEXT,
+              action TEXT NOT NULL, -- 'edit' or 'delete'
+              changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              changed_by INTEGER NOT NULL,
+              FOREIGN KEY(doc_id) REFERENCES documents(id),
+              FOREIGN KEY(changed_by) REFERENCES users(id)
+              )''')              
 
     conn.commit()
     conn.close()
@@ -156,6 +208,30 @@ def extract_text_from_file(filepath):
             return pytesseract.image_to_string(Image.open(filepath))
     except Exception as e:
         return f"Error extracting text: {str(e)}"
+
+#activity logging
+def log_activity(user_id, action, details=''):
+    retries = 5
+    while retries > 0:
+        try:
+            conn = sqlite3.connect('documents.db')
+            c = conn.cursor()
+            c.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)",
+                      (user_id, action, details))
+            conn.commit()
+            conn.close()
+            break  # success, exit loop
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e):
+                retries -= 1
+                time.sleep(0.1)  # wait a bit before retrying
+                continue
+            else:
+                raise
+        except Exception:
+            raise
+
+
 
 @app.route('/')
 def index():
@@ -225,6 +301,7 @@ def login():
         if row and check_password_hash(row[3], password):
             user = User(row[0], row[1], row[2])
             login_user(user)
+            log_activity(user.id, 'login', f'User {user.username} logged in')
             return redirect(url_for('index'))
         else:
             return "Invalid username or password", 401
@@ -271,6 +348,7 @@ def upload_file():
         c.execute("""INSERT INTO documents (filename, filepath, extracted_text, upload_date, doc_type, project, user_id) 
                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
                   (filename, filepath, extracted_text, upload_time, doc_type, project, current_user.id))
+        log_activity(current_user.id, 'upload', f'Uploaded "{filename}"')
         conn.commit()
         doc_id = c.lastrowid
         conn.close()
@@ -331,21 +409,35 @@ def list_documents():
 def view_document(doc_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
-    c.execute("SELECT filepath FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id,))
-    row =c.fetchone()
+    
+    # Check if admin
+    c.execute("SELECT is_admin FROM users WHERE id = ?", (current_user.id,))
+    admin_row = c.fetchone()
+    is_admin = admin_row and admin_row[0] == 1
+
+    if is_admin:
+        c.execute("""SELECT filename, filepath, doc_type, project, upload_date, username
+                     FROM documents d
+                     JOIN users u ON d.user_id = u.id
+                     WHERE d.id = ?""", (doc_id,))
+    else:
+        c.execute("""SELECT filename, filepath, doc_type, project, upload_date, username
+                     FROM documents d
+                     JOIN users u ON d.user_id = u.id
+                     WHERE d.id = ? AND d.user_id = ?""", (doc_id, current_user.id))
+    
+    row = c.fetchone()
     conn.close()
+    if not row:
+        abort(404)
 
-    if row is None:
-        abort(404)  #document not found
+    filename, filepath, doc_type, project, upload_date, uploader = row  # unpack all
 
-    filepath = row[0]
-
-    #security check: ensure that file exist and is inside the uploads folder
     if not os.path.exists(filepath):
         abort(404)
 
-    #serve file
     return send_from_directory(os.path.dirname(filepath), os.path.basename(filepath))
+
 
 #preview document 
 @app.route('/preview/<int:doc_id>')
@@ -353,20 +445,30 @@ def view_document(doc_id):
 def preview_document(doc_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
-    c.execute("""
-              SELECT d.filename, d.filepath, d.doc_type, d.project, d.upload_date, u.username
-              FROM documents d
-              JOIN users u ON d.user_id = u.id
-              WHERE d.id = ? AND d.user_id = ?
-              """, (doc_id, current_user.id,))
+
+    # Check if admin
+    c.execute("SELECT is_admin FROM users WHERE id = ?", (current_user.id,))
+    admin_row = c.fetchone()
+    is_admin = admin_row and admin_row[0] == 1
+
+    if is_admin:
+        c.execute("""SELECT d.filename, d.filepath, d.doc_type, d.project, d.upload_date, u.username
+                     FROM documents d
+                     JOIN users u ON d.user_id = u.id
+                     WHERE d.id = ?""", (doc_id,))
+    else:
+        c.execute("""SELECT d.filename, d.filepath, d.doc_type, d.project, d.upload_date, u.username
+                     FROM documents d
+                     JOIN users u ON d.user_id = u.id
+                     WHERE d.id = ? AND d.user_id = ?""", (doc_id, current_user.id))
+
     row = c.fetchone()
     conn.close()
-
-    if row is None:
+    if not row:
         abort(404)
 
     filename, filepath, doc_type, project, upload_date, uploader_username = row
-
+    
     #determine file type
     ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
     template_kwargs = {
@@ -389,13 +491,11 @@ def preview_document(doc_id):
         #other file
         return redirect(url_for('view_document', doc_id=doc_id))
 
-#edit document
+#edit document (rename, change type/project)
 @app.route('/edit/<int:doc_id>', methods=['POST'])
 @login_required
 def edit_document(doc_id):
-    conn = sqlite3.connect('documents.db')
-    c = conn.cursor()
-
+    # Get form data FIRST
     new_filename = request.form['filename'].strip()
     doc_type = request.form.get('type', '')
     project = request.form.get('project', '')
@@ -403,12 +503,33 @@ def edit_document(doc_id):
     if not new_filename:
         return "Filename can't be empty", 400
 
-    # Get current file info
-    c.execute("SELECT filename, filepath FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id))
+    conn = sqlite3.connect('documents.db')
+    c = conn.cursor()
+
+    # Get current file info (including type/project)
+    c.execute("SELECT filename, filepath, doc_type, project, user_id FROM documents WHERE id = ?", (doc_id,))
     row = c.fetchone()
     if not row:
+        conn.close()
         abort(404)
-    old_filename, old_filepath = row
+    old_filename, old_filepath, old_doc_type, old_project, owner_id = row
+
+    # Check ownership or admin
+    if owner_id != current_user.id:
+        c.execute("SELECT is_admin FROM users WHERE id = ?", (current_user.id,))
+        admin_row = c.fetchone()
+        if not admin_row or admin_row[0] != 1:
+            conn.close()
+            abort(403)
+
+    # Versioning
+    c.execute("SELECT COUNT(*) FROM document_versions WHERE doc_id = ?", (doc_id,))
+    count = c.fetchone()[0]
+    new_version = count + 1
+
+    c.execute("""INSERT INTO document_versions (doc_id, version, filename, filepath, doc_type, project, action, changed_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+              (doc_id, new_version, old_filename, old_filepath, old_doc_type, old_project, 'edit', current_user.id))
 
     # Determine new filename with extension
     ext = old_filename.rsplit('.', 1)[-1] if '.' in old_filename else ''
@@ -420,6 +541,7 @@ def edit_document(doc_id):
     try:
         os.rename(old_filepath, new_filepath)
     except Exception as e:
+        conn.close()
         return f"Error renaming file: {str(e)}", 500
 
     # Update database
@@ -427,6 +549,9 @@ def edit_document(doc_id):
                  SET filename = ?, filepath = ?, doc_type = ?, project = ? 
                  WHERE id = ?""",
               (new_filename, new_filepath, doc_type, project, doc_id))
+
+    log_activity(current_user.id, 'edit', f'Edited document "{old_filename}" to "{new_filename}", type: {doc_type}, project: {project}')
+
     conn.commit()
     conn.close()
 
@@ -439,30 +564,83 @@ def delete_document(doc_id):
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
 
-    #get filepath
-    c.execute("SELECT filepath FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id,))
+    # Get full info
+    c.execute("SELECT filename, filepath, doc_type, project, user_id FROM documents WHERE id = ?", (doc_id,))
     row = c.fetchone()
     if not row:
         conn.close()
         abort(404)
+    filename, filepath, doc_type, project, owner_id = row
 
-    filepath = row[0]
+    # Check ownership or admin
+    if owner_id != current_user.id:
+        c.execute("SELECT is_admin FROM users WHERE id = ?", (current_user.id,))
+        admin_row = c.fetchone()
+        if not admin_row or admin_row[0] != 1:
+            conn.close()
+            abort(403)
 
-    #delete from database
-    c.execute("DELETE FROM documents WHERE id = ? AND user_id = ?", (doc_id, current_user.id))
+    # Versioning
+    c.execute("SELECT COUNT(*) FROM document_versions WHERE doc_id = ?", (doc_id,))
+    count = c.fetchone()[0]
+    new_version = count + 1
+
+    c.execute("""INSERT INTO document_versions (doc_id, version, filename, filepath, doc_type, project, action, changed_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+              (doc_id, new_version, filename, filepath, doc_type, project, 'delete', current_user.id))
+
+    # Log
+    log_activity(current_user.id, 'delete', f'Deleted "{filename}"')
+
+    # Delete from database
+    c.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
     conn.commit()
     conn.close()
 
-    #delete file from disk
+    # Delete file
     try:
         if os.path.exists(filepath):
             os.remove(filepath)
     except Exception as e:
-        #log error, L file not so skibidi sigma 
-        print(f"L deleting file {filepath}: {e}")
+        print(f"Error deleting file {filepath}: {e}")
 
     return redirect(url_for('list_documents'))
 
+#admin route
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_dashboard():
+    conn = sqlite3.connect('documents.db')
+    c = conn.cursor()
+
+    #get user stats
+    c.execute("SELECT id, username, email, is_admin, created_at FROM users ORDER BY id")
+    users = c.fetchall()
+
+    #get document stats
+    c.execute("""
+              SELECT d.id, d.filename, d.doc_type, d.project, d.upload_date, u.username
+              FROM documents d
+              JOIN users u ON d.user_id = u.id
+              ORDER BY d.upload_date DESC
+              """)
+    documents = c.fetchall()
+
+    #get activity logs
+    c.execute("""
+              SELECT a.action, a.details, a.timestamp, u.username
+              FROM activity_log a
+              JOIN users u ON a.user_id = u.id
+              ORDER BY a.timestamp DESC
+              LIMIT 100
+              """)
+    log = c.fetchall()
+
+    conn.close()
+    return render_template('admin_dashboard.html', users=users, documents=documents, log=log)
+
+
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, threaded=False)

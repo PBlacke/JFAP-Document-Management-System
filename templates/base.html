@@ -130,6 +130,9 @@
             {% if current_user.is_authenticated %}
                 <a href="{{ url_for('list_documents') }}" class="{% if active_page == 'documents' %}active{% endif %}">Documents</a>
             {% endif %}
+            {% if current_user.is_authenticated and current_user.is_admin %}
+            <a href="{{ url_for('admin_dashboard') }}" class="{% if active_page == 'admin' %}active{% endif %}">Admin</a>
+             {% endif %}
         </div>
         <div class="nav-right">
             {% if current_user.is_authenticated %}

@@ -28,7 +28,7 @@ Encountered bugs: missing doc_id in template context and SQL query errors (typo 
 🐛 Challenges: Preview feature was incomplete due to template variable errors and database query issues.
 
 
-🗓️ March 3, 2026 – Feature Completion, UI Polish, and Final Debugging
+🗓️ March 3, 2026 – Feature Completion, UI Polish, and Debugging
     Enhanced upload interface:
         - Added drag‑and‑drop support to the upload area (files are placed into the file input but not auto‑uploaded – user must click the button, maintaining consistent behaviour).
         - Added Document Type dropdown (PR, PO, Other) and Project text field to the upload form; these are stored in the database.
@@ -58,7 +58,7 @@ Encountered bugs: missing doc_id in template context and SQL query errors (typo 
         - Edit modal opens with correct data, saves changes (file renamed, database updated).
         - Delete removes both record and file.
         - All features working smoothly.
-✅ Final outcome: A fully functional DMS prototype with upload (with drag‑and‑drop), OCR, search, preview, inline editing modal, and delete, complete with document tagging (type/project) and a polished UI. Well‑documented on GitHub.
+✅ Outcome: A fully functional DMS prototype with upload (with drag‑and‑drop), OCR, search, preview, inline editing modal, and delete, complete with document tagging (type/project) and a polished UI. Well‑documented on GitHub.
 
 
 🗓️ March 4, 2026 – Full‑Text Search, User Authentication, and UI Polish
@@ -84,4 +84,20 @@ Encountered bugs: missing doc_id in template context and SQL query errors (typo 
         - Corrected unpacking errors in preview_document – selected only the needed columns.
         - Added ownership verification to all document‑specific endpoints (/edit, /delete, /preview, /view) to prevent cross‑user access.
         - Tidied up the UI for login and registration with consistent styling and helpful hints.
-✅ Final outcome: The JFAP DMS Prototype now boasts multi‑user support, fast and relevant full‑text search, and a cohesive, secure experience. All core features (upload, OCR, search, preview, edit, delete) are locked to individual users. The system is ready for further enhancements like email verification or deployment.
+✅ Outcome: The JFAP DMS Prototype now boasts multi‑user support, fast and relevant full‑text search, and a cohesive, secure experience. All core features (upload, OCR, search, preview, edit, delete) are locked to individual users. The system is ready for further enhancements like email verification or deployment.
+
+
+🗓️ March 5, 2026 – UI/UX Enhancements, and Tweaks
+    Implemented a consistent navigation bar using template inheritance (base.html):
+        - Navbar includes logo, Home, Documents links, and a profile dropdown with user's full name and email.
+        - Added active page highlighting.
+        - Integrated logout link with a custom icon.
+    Added a simple footer across all pages: "Developed by me for JFAP Construction".
+    Redesigned document preview page:
+        - Split layout into two columns: left side shows the document (image or PDF), right side displays a details panel.
+        - Panel includes document type, project, uploader's username, upload date, and a prominent "Download Original" button styled like site buttons.
+        - Fixed a bug where the preview route selected too few columns (caused unpack error) – now correctly fetches all metadata.
+    Database housekeeping:
+        - Noted that old files (uploaded before user authentication) had NULL user_id and were not showing in the documents list.
+        - Advised on updating them with UPDATE documents SET user_id = ? WHERE user_id IS NULL to associate with the current user.
+✅ Outcome: The JFAP DMS Prototype now boasts a polished, professional interface with consistent navigation, and a user‑friendly preview panel. All core features remain stable and secure.
