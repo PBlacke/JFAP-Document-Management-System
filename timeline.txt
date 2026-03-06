@@ -101,3 +101,35 @@ Encountered bugs: missing doc_id in template context and SQL query errors (typo 
         - Noted that old files (uploaded before user authentication) had NULL user_id and were not showing in the documents list.
         - Advised on updating them with UPDATE documents SET user_id = ? WHERE user_id IS NULL to associate with the current user.
 ✅ Outcome: The JFAP DMS Prototype now boasts a polished, professional interface with consistent navigation, and a user‑friendly preview panel. All core features remain stable and secure.
+
+
+🗓️ March 6, 2026 – Admin Features, Activity Logging, Versioning, and UI Polish
+    Implemented admin user system:
+        - Added is_admin column to users table.
+        - Created @admin_required decorator to protect admin‑only routes.
+        - Built admin dashboard showing all users, all documents, and recent activity logs.
+        - Admin can view/edit/delete any document, regardless of ownership.
+    Added comprehensive activity logging:
+        - Created activity_log table to track user actions (login, upload, edit, delete).
+        - Integrated log_activity() calls throughout key routes.
+        - Admin dashboard displays last 100 actions with timestamps and usernames.
+    Introduced document versioning:
+        - Created document_versions table to store historical versions of documents.
+        - On edit: saves a version record with old filename, type, project before applying changes.
+        - On delete: saves a version record before permanent removal.
+        - Versioning includes action type ('edit' or 'delete'), timestamp, and user who performed the action.
+    Fixed critical bugs in edit/delete routes:
+        - Corrected missing form data extraction in edit_document.
+        - Added proper handling of doc_type and project for versioning.
+        - Fixed SQL parameter binding in load_user (added missing comma).
+        - Corrected column indexing in view_document.
+        - Resolved "database is locked" errors by adjusting concurrency handling.
+    UI/UX improvements:
+        - Redesigned login and registration pages with centered layout and logo placeholders.
+        - Removed top navigation links for a cleaner, focused authentication flow.
+        - Maintained consistent styling across both forms.
+    Performance considerations:
+        - Noted slowdown in uploads and updates; added timing logs to identify bottlenecks.
+        - Planned optimizations: WAL mode, indexes, and threaded=False for development.
+        - Decided to postpone HTMX page transitions until performance is improved.
+✅ Outcome: The JFAP DMS Prototype now features full admin capabilities, audit trails, document version history, and a polished authentication UI. The system is more robust and ready for deeper performance tuning.

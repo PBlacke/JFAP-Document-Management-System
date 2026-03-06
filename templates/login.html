@@ -7,56 +7,113 @@
     <link rel="icon" href="{{ url_for('static', filename='fav.png') }}" type="image/png">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; margin-bottom: 30px; }
-        h2 { color: #666; margin: 20px 0; }
-        .nav-links { margin-bottom: 20px; }
-        .nav-links a { color: #415f97; text-decoration: none; margin-right: 20px; }
-        .nav-links a:hover { text-decoration: underline; }
-        form { margin-top: 20px; }
-        label { display: block; margin: 15px 0 5px; color: #333; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: white;
+            padding: 40px 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .logo-placeholder {
+            width: 120px;
+            height: 120px;
+            background-color: #e0e0e0;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #666;
+            border: 2px dashed #415f97;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 30px;
+            font-weight: 400;
+        }
+        form {
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin: 15px 0 5px;
+            color: #333;
+            font-weight: 500;
+        }
         input[type="text"], input[type="password"] {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            border-color: #415f97;
+            outline: none;
         }
         button {
+            width: 100%;
             background: #415f97;
             color: white;
             border: none;
-            padding: 12px 30px;
+            padding: 14px;
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
-            margin-top: 20px;
+            font-weight: 500;
+            margin-top: 25px;
+            transition: background 0.2s;
         }
-        button:hover { background: #2c3e6b; }
-        p { margin-top: 20px; }
-        p a { color: #415f97; text-decoration: none; }
-        p a:hover { text-decoration: underline; }
+        button:hover {
+            background: #2c3e6b;
+        }
+        p {
+            margin-top: 25px;
+            color: #666;
+        }
+        p a {
+            color: #415f97;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        p a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="nav-links">
-            <a href="{{ url_for('index') }}">Home</a>
-            <a href="{{ url_for('register') }}">Register</a>
+        <!-- Logo placeholder – replace with <img src="logo.gif"> later -->
+        <div class="logo-placeholder">
+            LOGO
         </div>
 
-        <h2>Login</h2>
+        <h2>Welcome Back!</h2>
 
         <form method="POST">
-            <label for="username">Username:</label>
+            <label for="username">Username</label>
             <input type="text" id="username" name="username" required>
 
-            <label for="password">Password:</label>
+            <label for="password">Password</label>
             <input type="password" id="password" name="password" required>
 
-            <button type="submit">Login</button>
+            <button type="submit">Log In</button>
         </form>
 
-        <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p></body>
+        <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
+    </div>
+</body>
 </html>
