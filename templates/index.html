@@ -98,9 +98,16 @@
                 `;
                 progress.innerHTML = 'Upload complete!';
 
-                // Clear search results and show new content
-                document.getElementById('searchInput').value = '';
-                document.getElementById('searchResults').innerHTML = '';
+                    // Clear the file input
+                    document.getElementById('fileInput').value = '';
+
+                    // Optional: clear type and project fields
+                    document.getElementById('docType').value = '';
+                    document.getElementById('projectName').value = '';
+
+                    // Clear search results and show new content
+                    document.getElementById('searchInput').value = '';
+                    document.getElementById('searchResults').innerHTML = '';
             } else {
                 resultDiv.innerHTML = `<p style="color: red">Error: ${data.error}</p>`;
                 progress.innerHTML = '';

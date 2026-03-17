@@ -107,7 +107,7 @@ def init_db():
             raise e
 
     #rebuil fts index 
-    c.execute("INSERT INTO documents_fts(documents_fts) VALUES('rebuild')")           
+    #c.execute("INSERT INTO documents_fts(documents_fts) VALUES('rebuild')")           
 
     #triggers to keep fts in sync
     c.executescript('''
@@ -165,7 +165,11 @@ def init_db():
               changed_by INTEGER NOT NULL,
               FOREIGN KEY(doc_id) REFERENCES documents(id),
               FOREIGN KEY(changed_by) REFERENCES users(id)
-              )''')              
+              )''')       
+
+    c.execute("CREATE INDEX IF NOT EXISTS idx_document_versions_doc_id ON document_versions(doc_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_documents_id ON documents(id)")  # already primary key, but explicit
+    c.execute("CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON activity_log(user_id)")       
 
     conn.commit()
     conn.close()
@@ -211,24 +215,29 @@ def extract_text_from_file(filepath):
 
 #activity logging
 def log_activity(user_id, action, details=''):
+    start = time.time()
     retries = 5
     while retries > 0:
         try:
             conn = sqlite3.connect('documents.db')
+            conn.execute("PRAGMA journal_mode=WAL")
             c = conn.cursor()
             c.execute("INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)",
                       (user_id, action, details))
             conn.commit()
             conn.close()
-            break  # success, exit loop
+            print(f"[LOG] activity logged in {time.time()-start:.3f}s")
+            return
         except sqlite3.OperationalError as e:
             if "locked" in str(e):
                 retries -= 1
-                time.sleep(0.1)  # wait a bit before retrying
+                time.sleep(0.1)
                 continue
             else:
+                print(f"[LOG] error: {e}")
                 raise
-        except Exception:
+        except Exception as e:
+            print(f"[LOG] error: {e}")
             raise
 
 
@@ -320,38 +329,60 @@ def logout():
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload_file():
+    start_total = time.time()
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
-    
+
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
-    
+
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        # --- File save ---
+        start_save = time.time()
         file.save(filepath)
+        save_time = time.time() - start_save
+        print(f"[UPLOAD] File save: {save_time:.3f}s")
 
-        #OCR text extract
+        # --- OCR ---
+        start_ocr = time.time()
         extracted_text = extract_text_from_file(filepath)
+        ocr_time = time.time() - start_ocr
+        print(f"[UPLOAD] OCR: {ocr_time:.3f}s")
 
-        #get form data
+        # Get form data
         doc_type = request.form.get('type', '')
         project = request.form.get('project', '')
 
-        #get system current timee
         upload_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        #save to database
+        # --- MAIN DATABASE INSERT ---
+        start_insert = time.time()
         conn = sqlite3.connect('documents.db')
+        conn.execute("PRAGMA journal_mode=WAL")
         c = conn.cursor()
-        c.execute("""INSERT INTO documents (filename, filepath, extracted_text, upload_date, doc_type, project, user_id) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        c.execute("""INSERT INTO documents 
+                     (filename, filepath, extracted_text, upload_date, doc_type, project, user_id) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?)""",
                   (filename, filepath, extracted_text, upload_time, doc_type, project, current_user.id))
-        log_activity(current_user.id, 'upload', f'Uploaded "{filename}"')
-        conn.commit()
         doc_id = c.lastrowid
+        conn.commit()
         conn.close()
+        insert_time = time.time() - start_insert
+        print(f"[UPLOAD] Main insert + commit: {insert_time:.3f}s")
+
+        # --- LOG ACTIVITY SEPARATELY ---
+        start_log = time.time()
+        log_activity(current_user.id, 'upload', f'Uploaded "{filename}"')
+        log_time = time.time() - start_log
+        print(f"[UPLOAD] log_activity: {log_time:.3f}s")
+
+        total = time.time() - start_total
+        print(f"[UPLOAD] TOTAL: {total:.3f}s")
 
         return jsonify({
             'id': doc_id,
@@ -359,7 +390,7 @@ def upload_file():
             'text': extracted_text[:500] + '...' if len(extracted_text) > 500 else extracted_text,
             'full_text': extracted_text
         })
-    
+
     return jsonify({'error': 'File type not allowed'}), 400
 
 @app.route('/search')
@@ -393,15 +424,25 @@ def search():
 @app.route('/documents')
 @login_required
 def list_documents():
+    start = time.time()
     conn = sqlite3.connect('documents.db')
+    conn.execute("PRAGMA journal_mode=WAL")
     c = conn.cursor()
     c.execute("""SELECT id, filename, upload_date, doc_type, project 
               FROM documents 
               WHERE user_id = ?
               ORDER BY upload_date DESC""", (current_user.id,))
     docs = c.fetchall()
+    query_time = time.time() - start
+    print(f"[DOCUMENTS] Query: {query_time:.3f}s for {len(docs)} documents")
+    render_start = time.time()
+    rendered = render_template('documents.html', documents=docs)
+    render_time = time.time() - render_start
+    print(f"[DOCUMENTS] Render took: {render_time:.3f}s")
     conn.close()
-    return render_template('documents.html', documents=docs)
+    total_time = time.time() - start
+    print(f"[DOCUMENTS] TOTAL: {total_time:.3f}s")
+    return rendered
 
 #view document
 @app.route('/view/<int:doc_id>')
@@ -561,50 +602,78 @@ def edit_document(doc_id):
 @app.route('/delete/<int:doc_id>', methods=['POST'])
 @login_required
 def delete_document(doc_id):
+    start_total = time.time()
+
     conn = sqlite3.connect('documents.db')
+    conn.execute("PRAGMA journal_mode=WAL")
     c = conn.cursor()
 
-    # Get full info
+    # --- Get document info ---
+    start_fetch = time.time()
     c.execute("SELECT filename, filepath, doc_type, project, user_id FROM documents WHERE id = ?", (doc_id,))
     row = c.fetchone()
     if not row:
         conn.close()
         abort(404)
     filename, filepath, doc_type, project, owner_id = row
+    fetch_time = time.time() - start_fetch
+    print(f"[DELETE] Fetch document: {fetch_time:.3f}s")
 
-    # Check ownership or admin
+    # --- Ownership check (admin) ---
+    start_owner = time.time()
     if owner_id != current_user.id:
         c.execute("SELECT is_admin FROM users WHERE id = ?", (current_user.id,))
         admin_row = c.fetchone()
         if not admin_row or admin_row[0] != 1:
             conn.close()
             abort(403)
+    owner_time = time.time() - start_owner
+    print(f"[DELETE] Ownership check: {owner_time:.3f}s")
 
-    # Versioning
+    # --- Versioning: get count and insert ---
+    start_version_count = time.time()
     c.execute("SELECT COUNT(*) FROM document_versions WHERE doc_id = ?", (doc_id,))
     count = c.fetchone()[0]
     new_version = count + 1
+    version_count_time = time.time() - start_version_count
+    print(f"[DELETE] Version count: {version_count_time:.3f}s")
 
+    start_version_insert = time.time()
     c.execute("""INSERT INTO document_versions (doc_id, version, filename, filepath, doc_type, project, action, changed_by)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
               (doc_id, new_version, filename, filepath, doc_type, project, 'delete', current_user.id))
+    version_insert_time = time.time() - start_version_insert
+    print(f"[DELETE] Version insert: {version_insert_time:.3f}s")
 
-    # Log
+    # --- Log activity ---
+    start_log = time.time()
     log_activity(current_user.id, 'delete', f'Deleted "{filename}"')
+    log_time = time.time() - start_log
+    print(f"[DELETE] log_activity: {log_time:.3f}s")
 
-    # Delete from database
+    # --- Delete from database ---
+    start_delete_db = time.time()
     c.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
     conn.commit()
     conn.close()
+    delete_db_time = time.time() - start_delete_db
+    print(f"[DELETE] DB delete + commit: {delete_db_time:.3f}s")
 
-    # Delete file
+    # --- Delete file from disk ---
+    start_file_del = time.time()
     try:
         if os.path.exists(filepath):
             os.remove(filepath)
     except Exception as e:
         print(f"Error deleting file {filepath}: {e}")
+    file_del_time = time.time() - start_file_del
+    print(f"[DELETE] File deletion: {file_del_time:.3f}s")
+
+    total = time.time() - start_total
+    print(f"[DELETE] TOTAL: {total:.3f}s")
 
     return redirect(url_for('list_documents'))
+
 
 #admin route
 @app.route('/admin')
