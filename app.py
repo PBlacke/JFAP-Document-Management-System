@@ -682,6 +682,7 @@ def delete_document(doc_id):
 def admin_dashboard():
     conn = sqlite3.connect('documents.db')
     c = conn.cursor()
+    conn.execute("PRAGMA journal_mode=WAL")
 
     #get user stats
     c.execute("SELECT id, username, email, is_admin, created_at FROM users ORDER BY id")
@@ -705,6 +706,9 @@ def admin_dashboard():
               LIMIT 100
               """)
     log = c.fetchall()
+
+    print(f"Number of log entries: {len(log)}")
+    print("First log entry:", log[0] if log else "No logs")
 
     conn.close()
     return render_template('admin_dashboard.html', users=users, documents=documents, log=log)

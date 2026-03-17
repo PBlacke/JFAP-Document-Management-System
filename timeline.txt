@@ -133,3 +133,17 @@ Encountered bugs: missing doc_id in template context and SQL query errors (typo 
         - Planned optimizations: WAL mode, indexes, and threaded=False for development.
         - Decided to postpone HTMX page transitions until performance is improved.
 ✅ Outcome: The JFAP DMS Prototype now features full admin capabilities, audit trails, document version history, and a polished authentication UI. The system is more robust and ready for deeper performance tuning.
+
+🗓️ March 9, 2026 – Performance Optimization, Bottleneck Hunting, and Stabilisation
+    Focused on diagnosing and improving system performance after noticing slow uploads and deletions.
+    Added detailed timing logs to /upload, /delete, and /documents routes to pinpoint slow operations.
+    Enabled Write‑Ahead Logging (WAL) on all database connections to reduce locking and improve concurrency.
+    Created database indexes on frequently queried columns: documents(user_id), documents(upload_date), document_versions(doc_id), and activity_log(user_id) – drastically speeding up queries.
+    Optimised the /upload route:
+        Separated main document insert from log_activity to avoid contention.
+        Reduced total upload time from ~31 seconds to ~2 seconds (with OCR still the main contributor).
+    Investigated slow deletions:
+        Discovered that the delay was actually in the redirect to /documents, not the delete itself.
+        Added timing to list_documents and confirmed query performance improved with new indexes.
+    Encountered new bugs (unexpected behaviour in delete and list views) – decided to pause and return on Wednesday with fresh eyes.
+✅ Outcome: The system is now significantly faster and more robust. Uploads average ~2 seconds, and document listing is near‑instant even with many records. Remaining issues noted for later resolution.
