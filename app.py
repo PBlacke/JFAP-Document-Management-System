@@ -6,16 +6,17 @@ import pytesseract
 from PIL import Image
 import pdf2image
 import tempfile
-from flask import send_from_directory, abort
+from flask import send_from_directory, abort, send_file, Response 
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from functools import wraps
 import time
-from flask import send_file
 import io
 import secrets
+import csv
+
 
 #app configuration
 app = Flask(__name__)
@@ -786,6 +787,34 @@ def export_documents():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
         download_name='documents_export.xlsx'
+    )
+
+@app.route('/export-documents-csv')
+@login_required
+def export_documents_csv():
+    conn = sqlite3.connect('documents.db')
+    c = conn.cursor()
+
+    query = """
+    SELECT d.filename, d.doc_type, d.project, d.upload_date, u.username as uploader
+        FROM documents d
+        JOIN users u ON d.user_id = u.id
+        ORDER BY d.upload_date DESC
+    """
+    c.execute(query)
+    rows = c.fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Filename', 'Document Type', 'Project', 'Upload Date', 'Uploader'])
+    writer.writerows(rows)
+    output.seek(0)
+
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment;filename=documents_export.csv'}
     )
 
 
