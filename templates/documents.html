@@ -33,7 +33,7 @@
 
 {% block content %}      
         <h1>All Uploaded Documents</h1>
-        
+        <a href="{{ url_for('export_documents') }}" class="btn">📥 Export to Excel</a>
         {% if documents %}
             {% for doc in documents %}
             <div class="doc-item" data-id="{{ doc[0] }}" data-filename="{{ doc[1] }}" data-type="{{ doc[3] if doc[3] else '' }}" data-project="{{ doc[4] if doc[4] else '' }}" data-ext="{{ doc[1].split('.')[-1] }}">

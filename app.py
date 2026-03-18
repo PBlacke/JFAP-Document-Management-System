@@ -13,7 +13,8 @@ import re
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from functools import wraps
 import time
-
+from flask import send_file
+import io
 
 #app configuration
 app = Flask(__name__)
@@ -428,18 +429,24 @@ def list_documents():
     conn = sqlite3.connect('documents.db')
     conn.execute("PRAGMA journal_mode=WAL")
     c = conn.cursor()
-    c.execute("""SELECT id, filename, upload_date, doc_type, project 
-              FROM documents 
-              WHERE user_id = ?
-              ORDER BY upload_date DESC""", (current_user.id,))
+
+    c.execute("""
+        SELECT d.id, d.filename, d.upload_date, d.doc_type, d.project, u.username
+        FROM documents d
+        JOIN users u ON d.user_id = u.id
+        ORDER BY d.upload_date DESC
+    """)
     docs = c.fetchall()
+
     query_time = time.time() - start
     print(f"[DOCUMENTS] Query: {query_time:.3f}s for {len(docs)} documents")
     render_start = time.time()
     rendered = render_template('documents.html', documents=docs)
     render_time = time.time() - render_start
     print(f"[DOCUMENTS] Render took: {render_time:.3f}s")
+
     conn.close()
+
     total_time = time.time() - start
     print(f"[DOCUMENTS] TOTAL: {total_time:.3f}s")
     return rendered
@@ -712,6 +719,34 @@ def admin_dashboard():
 
     conn.close()
     return render_template('admin_dashboard.html', users=users, documents=documents, log=log)
+
+
+@app.route('/export_documents')
+@login_required
+def export_documents():
+    import pandas as pd
+    conn = sqlite3.connect('documents.db')
+
+    query = """
+    SELECT d.filename, d.doc_type, d.project, d.upload_date, u.username as uploader
+        FROM documents d
+        JOIN users u ON d.user_id = u.id
+        ORDER BY d.upload_date DESC
+    """
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Documents')
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='documents_export.xlsx'
+    )
 
 
 
