@@ -15,9 +15,12 @@ from functools import wraps
 import time
 from flask import send_file
 import io
+import secrets
 
 #app configuration
 app = Flask(__name__)
+
+app.config['SECRET_KEY'] = secrets.token_hex(16)  # Use a secure random secret key
 
 #for user class
 class User(UserMixin):
@@ -131,6 +134,7 @@ def init_db():
               password_hash TEXT NOT NULL,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
               )''')
+
     
     try:
         c.execute("ALTER TABLE documents ADD COLUMN user_id INTEGER REFERENCES users(id)")
@@ -141,6 +145,11 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN approved INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
     #create activity log table
     c.execute('''CREATE TABLE IF NOT EXISTS activity_log (
@@ -285,7 +294,7 @@ def register():
 
         #hash password and insert
         pw_hash = generate_password_hash(password)
-        c.execute("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+        c.execute("INSERT INTO users (username, email, password_hash, approved) VALUES (?, ?, ?, 0)",
                   (username, email, pw_hash))
         conn.commit()
         conn.close()
@@ -304,11 +313,13 @@ def login():
 
         conn = sqlite3.connect('documents.db')
         c = conn.cursor()
-        c.execute("SELECT id, username, email, password_hash FROM users WHERE username = ?", (username,))
+        c.execute("SELECT id, username, email, password_hash, approved FROM users WHERE username = ?", (username,))
         row = c.fetchone()
         conn.close()
 
         if row and check_password_hash(row[3], password):
+            if row[4] == 0:
+                return "Your account is pending approval by admin. Please wait.", 403
             user = User(row[0], row[1], row[2])
             login_user(user)
             log_activity(user.id, 'login', f'User {user.username} logged in')
@@ -692,7 +703,7 @@ def admin_dashboard():
     conn.execute("PRAGMA journal_mode=WAL")
 
     #get user stats
-    c.execute("SELECT id, username, email, is_admin, created_at FROM users ORDER BY id")
+    c.execute("SELECT id, username, email, is_admin, created_at, approved FROM users ORDER BY id")
     users = c.fetchall()
 
     #get document stats
@@ -719,6 +730,19 @@ def admin_dashboard():
 
     conn.close()
     return render_template('admin_dashboard.html', users=users, documents=documents, log=log)
+
+@app.route('/approve-user/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def approve_user(user_id):
+    conn = sqlite3.connect('documents.db')
+    conn.execute("PRAGMA journal_mode=WAL")
+    c = conn.cursor()
+    c.execute("UPDATE users SET approved = 1 WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    log_activity(current_user.id, 'approve', f'Approved user ID {user_id}')
+    return redirect(url_for('admin_dashboard'))
 
 
 @app.route('/export_documents')

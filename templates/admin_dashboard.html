@@ -10,10 +10,21 @@
     <div style="flex: 1; min-width: 300px;">
         <h2>Users</h2>
         <table style="width:100%; border-collapse: collapse;">
-            <tr><th>ID</th><th>Username</th><th>Email</th><th>Admin</th><th>Created</th></tr>
+            <tr><th>ID</th><th>Username</th><th>Email</th><th>Admin</th><th>Created</th><th>Approved</th></tr>
             {% for u in users %}
             <tr>
-                <td>{{ u[0] }}</td><td>{{ u[1] }}</td><td>{{ u[2] }}</td><td>{{ 'Yes' if u[3] else 'No' }}</td><td>{{ u[4] }}</td>
+                <td>{{ u[0] }}</td>
+                <td>{{ u[1] }}</td>
+                <td>{{ u[2] }}</td>
+                <td>{{ 'Yes' if u[3] else 'No' }}</td>
+                <td>{{ u[4] }}</td>
+                <td>
+                    {% if not u[5] and not u[3] %}  {# if not approved and not admin #}
+                    <form action="{{ url_for('approve_user', user_id=u[0]) }}" method="POST" style="display:inline;">
+                        <button type="submit">Approve</button>
+                    </form>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </table>
@@ -53,9 +64,9 @@
         {% for log in log %}
         <tr>
             <td>{{ log[2] }}</td>
-            <td>{{ log[1] }}</td>
-            <td>{{ log[0] }}</td>
             <td>{{ log[3] }}</td>
+            <td>{{ log[0] }}</td>
+            <td>{{ log[1] }}</td>
         </tr>
         {% endfor %}
     </table>
