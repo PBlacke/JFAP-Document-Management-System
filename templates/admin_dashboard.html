@@ -42,6 +42,7 @@
         border-bottom: none;
         margin-right: 5px;
         border-radius: 5px 5px 0 0;
+        position: relative;
     }
     .tab.active {
         background: white;
@@ -81,6 +82,19 @@
     .btn-approve:hover {
         background: #218838;
     }
+    .notification-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background-color: #ff0000;
+        border-radius: 50%;
+        margin-left: 8px;
+        vertical-align: middle;
+        box-shadow: 0 0 5px rgba(255,0,0,0.5);
+        position: absolute;
+        top: 0px;
+        right: 0px;
+    }
 </style>
 {% endblock %}
 
@@ -104,7 +118,12 @@
 
 <!-- TABlea uwu -->
 <div class="tabs">
-    <div class="tab active" data-tab="users">Users</div>
+    <div class="tab active" data-tab="users">
+        Users
+        {% if pending_count > 0 %}
+            <span class="notification-dot"></span>
+        {% endif %}
+    </div>
     <div class="tab" data-tab="documents">Documents</div>
     <div class="tab" data-tab="logs">Activity Logs</div>
 </div>    

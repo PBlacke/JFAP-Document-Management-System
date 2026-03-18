@@ -712,6 +712,8 @@ def admin_dashboard():
     total_docs = c.fetchone()[0]
     c.execute("SELECT COUNT(*) FROM activity_log")  
     total_logs = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM users WHERE approved = 0")
+    pending_count = c.fetchone()[0]
 
     #get user stats
     c.execute("SELECT id, username, email, is_admin, created_at, approved FROM users ORDER BY id")
@@ -746,7 +748,8 @@ def admin_dashboard():
                            log=log,
                            total_users=total_users,
                            total_docs=total_docs,
-                           total_logs=total_logs
+                           total_logs=total_logs,
+                           pending_count=pending_count
                            )
 
 @app.route('/approve-user/<int:user_id>', methods=['POST'])
