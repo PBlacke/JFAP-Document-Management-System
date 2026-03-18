@@ -2,79 +2,245 @@
 {% block title %}Admin Dashboard{% endblock %}
 {% set active_page = 'admin' %}
 
+{% block extra_css %}
+<style>
+    /* Stats cards */
+    .stats-container {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+    }
+    .stat-card {
+        background: #667eea;
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        flex: 1 1 200px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .stat-card h3 {
+        font-size: 2em;
+        margin: 0;
+    }
+    .stat-card p {
+        margin: 5px 0 0;
+        opacity: 0.9;
+    }
+
+    /* Tabs */
+    .tabs {
+        display: flex;
+        border-bottom: 2px solid #ddd;
+        margin-bottom: 20px;
+    }
+    .tab {
+        padding: 10px 20px;
+        cursor: pointer;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        border-bottom: none;
+        margin-right: 5px;
+        border-radius: 5px 5px 0 0;
+    }
+    .tab.active {
+        background: white;
+        border-bottom: 2px solid white;
+        font-weight: bold;
+        color: #415f97;
+    }
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Tables */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    th, td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+    .btn-approve {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+    .btn-approve:hover {
+        background: #218838;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <h1>Admin Dashboard</h1>
 
-<div style="display: flex; gap: 20px; flex-wrap: wrap;">
-    <!-- Users Section -->
-    <div style="flex: 1; min-width: 300px;">
+<div class="stats-container">
+    <div class="stat-card">
+        <h3>{{ total_users }}</h3>
+        <p>Total Users</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ total_docs }}</h3>
+        <p>Total Documents</p>
+    </div>    
+    <div class="stat-card">
+        <h3>{{ total_logs }}</h3>
+        <p>Recent Activities</p>
+    </div>
+</div>
+
+<!-- TABlea uwu -->
+<div class="tabs">
+    <div class="tab active" data-tab="users">Users</div>
+    <div class="tab" data-tab="documents">Documents</div>
+    <div class="tab" data-tab="logs">Activity Logs</div>
+</div>    
+
+<!-- Users Section -->
+    <div class="tab-content active" id="users-section">
         <h2>Users</h2>
         <table style="width:100%; border-collapse: collapse;">
-            <tr><th>ID</th><th>Username</th><th>Email</th><th>Admin</th><th>Created</th><th>Approved</th></tr>
-            {% for u in users %}
-            <tr>
-                <td>{{ u[0] }}</td>
-                <td>{{ u[1] }}</td>
-                <td>{{ u[2] }}</td>
-                <td>{{ 'Yes' if u[3] else 'No' }}</td>
-                <td>{{ u[4] }}</td>
-                <td>
-                    {% if not u[5] and not u[3] %}  {# if not approved and not admin #}
-                    <form action="{{ url_for('approve_user', user_id=u[0]) }}" method="POST" style="display:inline;">
-                        <button type="submit">Approve</button>
-                    </form>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Admin</th>
+                    <th>Created</th>
+                    <th>Approval</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>{{ u[0] }}</td>
+                    <td>{{ u[1] }}</td>
+                    <td>{{ u[2] }}</td>
+                    <td>{{ 'Yes' if u[3] else 'No' }}</td>
+                    <td>{{ u[4] }}</td>
+                    <td>
+                        {% if not u[5] and not u[3] %}  {# if not approved and not admin #}
+                        <form action="{{ url_for('approve_user', user_id=u[0]) }}" method="POST" style="display:inline;">
+                            <button type="submit">Approve</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </div>
 
     <!-- Documents Section -->
-    <div style="flex: 2;">
+    <div id="documents-section" class="tab-content">
         <h2>All Documents</h2>
         <table style="width:100%; border-collapse: collapse;">
-            <tr><th>ID</th><th>Filename</th><th>Type</th><th>Project</th><th>Uploaded</th><th>By</th><th>Actions</th></tr>
-            {% for d in documents %}
-            <tr>
-                <td>{{ d[0] }}</td>
-                <td>{{ d[1] }}</td>
-                <td>{{ d[2] }}</td>
-                <td>{{ d[3] }}</td>
-                <td>{{ d[4] }}</td>
-                <td>{{ d[5] }}</td>
-                <td>
-                    <a href="{{ url_for('preview_document', doc_id=d[0]) }}">Preview</a> |
-                    <a href="{{ url_for('edit_document', doc_id=d[0]) }}">Edit</a> |
-                    <form action="{{ url_for('delete_document', doc_id=d[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this document?');">
-                        <button type="submit" style="background:none; border:none; color:#c00; cursor:pointer;">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Filename</th>
+                    <th>Type</th>
+                    <th>Project</th>
+                    <th>Uploaded</th>
+                    <th>By</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in documents %}
+                <tr>
+                    <td>{{ d[0] }}</td>
+                    <td>{{ d[1] }}</td>
+                    <td>{{ d[2] }}</td>
+                    <td>{{ d[3] }}</td>
+                    <td>{{ d[4] }}</td>
+                    <td>{{ d[5] }}</td>
+                    <td>
+                        <a href="{{ url_for('preview_document', doc_id=d[0]) }}">Preview</a> |
+                        <a href="{{ url_for('edit_document', doc_id=d[0]) }}">Edit</a> |
+                        <form action="{{ url_for('delete_document', doc_id=d[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this document?');">
+                            <button type="submit" style="background:none; border:none; color:#c00; cursor:pointer;">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </div>
-</div>
+   
 
 <!-- Activity Logs -->
-<div style="margin-top: 30px;">
+<div id="logs-section" class="tab-content">
     <h2>Recent Activity</h2>
     <table style="width:100%; border-collapse: collapse;">
-        <tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr>
-        {% for log in log %}
-        <tr>
-            <td>{{ log[2] }}</td>
-            <td>{{ log[3] }}</td>
-            <td>{{ log[0] }}</td>
-            <td>{{ log[1] }}</td>
-        </tr>
-        {% endfor %}
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in log %}
+                <tr>
+                    <td>{{ log[2] }}</td>
+                    <td>{{ log[3] }}</td>
+                    <td>{{ log[0] }}</td>
+                    <td>{{ log[1] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
     </table>
 </div>
 
-<style>
-    table { border: 1px solid #ddd; }
-    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-    th { background-color: #f2f2f2; }
-</style>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const tabs = document.querySelectorAll('.tab');
+        const contents = document.querySelectorAll('.tab-content');
+
+        // Function to switch active tab and show corresponding content
+        function switchTab(targetId) {
+            // Remove active class from all tabs and contents
+            tabs.forEach(tab => tab.classList.remove('active'));
+            contents.forEach(content => content.classList.remove('active'));
+
+            // Add active class to the clicked tab
+            const activeTab = document.querySelector(`.tab[data-tab="${targetId}"]`);
+            if (activeTab) activeTab.classList.add('active');
+
+            // Show the corresponding content
+            const activeContent = document.getElementById(`${targetId}-section`);
+            if (activeContent) activeContent.classList.add('active');
+        }
+
+        // Add click event to each tab
+        tabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-tab');
+                switchTab(targetId);
+            });
+        });
+
+        // Optionally, activate the first tab on page load if none is active
+        const activeTab = document.querySelector('.tab.active');
+        if (!activeTab && tabs.length > 0) {
+            const firstTabId = tabs[0].getAttribute('data-tab');
+            switchTab(firstTabId);
+        }
+    });
+</script>
 {% endblock %}

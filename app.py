@@ -702,13 +702,21 @@ def admin_dashboard():
     c = conn.cursor()
     conn.execute("PRAGMA journal_mode=WAL")
 
+    #counter (you want salad with that sir ehurhur)
+    c.execute("SELECT COUNT(*) FROM users")
+    total_users = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM documents")
+    total_docs = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM activity_log")  
+    total_logs = c.fetchone()[0]
+
     #get user stats
     c.execute("SELECT id, username, email, is_admin, created_at, approved FROM users ORDER BY id")
     users = c.fetchall()
 
     #get document stats
     c.execute("""
-              SELECT d.id, d.filename, d.doc_type, d.project, d.upload_date, u.username
+              SELECT d.id, d.filename, d.doc_type, d.project, d.upload_date, u.username, d.user_id
               FROM documents d
               JOIN users u ON d.user_id = u.id
               ORDER BY d.upload_date DESC
@@ -729,7 +737,14 @@ def admin_dashboard():
     print("First log entry:", log[0] if log else "No logs")
 
     conn.close()
-    return render_template('admin_dashboard.html', users=users, documents=documents, log=log)
+    return render_template('admin_dashboard.html', 
+                           users=users, 
+                           documents=documents, 
+                           log=log,
+                           total_users=total_users,
+                           total_docs=total_docs,
+                           total_logs=total_logs
+                           )
 
 @app.route('/approve-user/<int:user_id>', methods=['POST'])
 @login_required
@@ -749,6 +764,7 @@ def approve_user(user_id):
 @login_required
 def export_documents():
     import pandas as pd
+
     conn = sqlite3.connect('documents.db')
 
     query = """
