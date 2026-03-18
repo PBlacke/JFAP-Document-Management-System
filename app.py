@@ -6,7 +6,7 @@ import pytesseract
 from PIL import Image
 import pdf2image
 import tempfile
-from flask import send_from_directory, abort, send_file, Response 
+from flask import send_from_directory, abort, send_file, Response, flash 
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
@@ -320,13 +320,15 @@ def login():
 
         if row and check_password_hash(row[3], password):
             if row[4] == 0:
-                return "Your account is pending approval by admin. Please wait.", 403
+                flash("Your account is pending approval by an administrator.")
+                return redirect(url_for('login'))
             user = User(row[0], row[1], row[2])
             login_user(user)
             log_activity(user.id, 'login', f'User {user.username} logged in')
             return redirect(url_for('index'))
         else:
-            return "Invalid username or password", 401
+            flash("Invalid username or password")
+            return redirect(url_for('login'))
         
     return render_template('login.html')
 
