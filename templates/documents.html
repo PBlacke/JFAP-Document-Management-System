@@ -28,53 +28,117 @@
         #deleteBtn:hover { background: #a00;}
         .doc-meta { font-size: 0.85em; color: #666; margin-top: 5px;}
         .doc-meta span { margin-right: 15px;}
+
+        /* search form & pagination */
+        .search-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        .search-form input, .search-form select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .search-form input { flex: 2; min-width: 200px; }
+        .search-form select { min-width: 120px; }
+        .btn-clear { background: #ccc; color: #333; padding: 8px 12px; border-radius: 4px; text-decoration: none; }
+        .btn-clear:hover { background: #bbb; }
+        .pagination { margin-top: 20px; text-align: center; }
+        .pagination a, .pagination span { margin: 0 4px; padding: 5px 10px; text-decoration: none; border: 1px solid #ddd; border-radius: 4px; color: #415f97; }
+        .pagination span.current { background: #415f97; color: white; border-color: #415f97; }
+        .pagination a:hover { background: #f0f0f0; }
+
+        #deleteConfirmModal .modal-content p:first-of-type {
+        margin-top: 15px;
+        }
+        #deleteConfirmModal .modal-content button {
+            background: #c00;
+            color: white;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #deleteConfirmModal .modal-content button:first-of-type {
+            background: #ccc;
+            color: #333;
+        }
     </style>
 {% endblock %}
 
 {% block content %}      
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h1>All Uploaded Documents</h1>
         <a href="{{ url_for('export_documents') }}" class="btn">📥 Export to Excel</a>
-        {% if documents %}
-            {% for doc in documents %}
-            <div class="doc-item" data-id="{{ doc[0] }}" data-filename="{{ doc[1] }}" data-type="{{ doc[3] if doc[3] else '' }}" data-project="{{ doc[4] if doc[4] else '' }}" data-ext="{{ doc[1].split('.')[-1] }}">
-                <div class="filename">
-                    <a href="/preview/{{ doc[0] }}" target="_blank">📄 {{ doc[1] }}</a>
-                    <span style="float: right;">
-                        <!--Edit-->
-                        <button onclick="openEditModal('{{ doc[0] }}')" style="background: none; border: none; cursor: pointer; text-decoration: none; margin-right: 10px;">
-                            <img src="{{ url_for('static', filename='edit-text.png') }}" alt="edit">
-                        </button>
-
-                    </span>
-                </div>
-                <div class="doc-meta">
-                    <span>Type: {{ doc[3] if doc[3] else 'Not set' }}</span>
-                    <span>Project: {{ doc[4] if doc[4] else 'Not set' }}</span>
-                </div>
-                <div class="date">Uploaded: {{ doc[2] }}</div>
-            </div>
-            {% endfor %}
-        {% else %}
-            <div class="no-docs">
-                <p>No documents uploaded yet.</p>
-                <p><a href="/" style="color: #415f97;">Upload your first document!</a></p>
-            </div>
-        {% endif %}
     </div>
 
-    <!-- Edit Modal -->
+    <!-- Search and Filter Form -->
+    <form method="GET" action="{{ url_for('list_documents') }}" class="search-form">
+        <input type="text" name="q" placeholder="Search by filename, type, project..." value="{{ search_term or '' }}">
+        <select name="type">
+            <option value="">All Types</option>
+            <option value="PR" {% if type_filter == 'PR' %}selected{% endif %}>PR</option>
+            <option value="PO" {% if type_filter == 'PO' %}selected{% endif %}>PO</option>
+            <option value="Other" {% if type_filter == 'Other' %}selected{% endif %}>Other</option>
+        </select>
+        <button type="submit">Search</button>
+        {% if search_term or type_filter %}
+            <a href="{{ url_for('list_documents') }}" class="btn-clear">Clear</a>
+        {% endif %}
+    </form>
+
+    <p>Found <strong>{{ total_count }}</strong> document(s).</p>
+
+    {% if documents %}
+        {% for doc in documents %}
+        <div class="doc-item" data-id="{{ doc[0] }}" data-filename="{{ doc[1] }}" data-type="{{ doc[3] if doc[3] else '' }}" data-project="{{ doc[4] if doc[4] else '' }}" data-ext="{{ doc[1].split('.')[-1] }}">
+            <div class="filename">
+                <a href="/preview/{{ doc[0] }}" target="_blank">📄 {{ doc[1] }}</a>
+                <span style="float: right;">
+                    <button onclick="openEditModal('{{ doc[0] }}')" style="background: none; border: none; cursor: pointer; text-decoration: none; margin-right: 10px;">
+                        <img src="{{ url_for('static', filename='edit-text.png') }}" alt="edit">
+                    </button>
+                </span>
+            </div>
+            <div class="doc-meta">
+                <span>Type: {{ doc[3] if doc[3] else 'Not set' }}</span>
+                <span>Project: {{ doc[4] if doc[4] else 'Not set' }}</span>
+            </div>
+            <div class="date">
+                <span>Uploaded: {{ doc[2] }}</span>
+                <span>Uploader: {{ doc[5] }}</span>   {# uploader username #}
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            {% if current_page > 1 %}
+                <a href="{{ url_for('list_documents', page=current_page-1, q=search_term, type=type_filter) }}">« Previous</a>
+            {% endif %}
+            {% for p in range(1, total_pages+1) %}
+                {% if p == current_page %}
+                    <span class="current">{{ p }}</span>
+                {% else %}
+                    <a href="{{ url_for('list_documents', page=p, q=search_term, type=type_filter) }}">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+            {% if current_page < total_pages %}
+                <a href="{{ url_for('list_documents', page=current_page+1, q=search_term, type=type_filter) }}">Next »</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    {% else %}
+        <div class="no-docs">
+            <p>No documents found matching your criteria.</p>
+            <p><a href="{{ url_for('list_documents') }}" style="color: #415f97;">Clear filters</a></p>
+        </div>
+    {% endif %}
+
+    <!-- Edit Modal (unchanged) -->
     <div id="editModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
             <h2>Edit Document</h2>
-            <div id="preview-area" style="text-align: center; margin-bottom: 15px;">
-                <!-- Preview will be inserted here by JavaScript -->
-            </div>
-
+            <div id="preview-area" style="text-align: center; margin-bottom: 15px;"></div>
             <form id="editForm" method="POST" action="">
                 <label for="edit-filename">Filename (without extension):</label>
                 <input type="text" id="edit-filename" name="filename" required>
-
                 <label for="edit-type">Document Type:</label>
                 <select name="type" id="edit-type">
                     <option value="">--Select---</option>
@@ -82,7 +146,6 @@
                     <option value="PO">Purchase Order</option>
                     <option value="Other">Other</option>
                 </select>
-
                 <label for="edit-project">Project:</label>
                 <input type="text" id="edit-project" name="project" placeholder="Project Name">
                 <button type="submit">Save Changes</button>
@@ -95,9 +158,10 @@
     </div>
 {% endblock %}
 
+
 {% block extra_js %}
 <script>
-    // Get modal elements
+    // --- Edit Modal logic (unchanged) ---
     const modal = document.getElementById('editModal');
     const closeBtn = document.querySelector('.close');
     const editForm = document.getElementById('editForm');
@@ -107,7 +171,6 @@
     const editProjectInput = document.getElementById('edit-project');
     const previewArea = document.getElementById('preview-area');
 
-    // Close modal when clicking X or outside
     closeBtn.onclick = function() {
         modal.style.display = 'none';
     }
@@ -117,42 +180,82 @@
         }
     }
 
-    // Function to open modal and populate fields
     function openEditModal(docId) {
-        // Find the document item by data-id
         const docItem = document.querySelector(`.doc-item[data-id="${docId}"]`);
         if (!docItem) return;
-
-        // Extract data from dataset
         const filename = docItem.dataset.filename;
         const docType = docItem.dataset.type || '';
         const project = docItem.dataset.project || '';
         const fileExt = docItem.dataset.ext;
-
-        // Set filename without extension
         const nameWithoutExt = filename.includes('.') ? filename.substring(0, filename.lastIndexOf('.')) : filename;
         editFilenameInput.value = nameWithoutExt;
-
-        // Set type and project
         editTypeSelect.value = docType;
         editProjectInput.value = project;
-
-        // Set form actions
         editForm.action = `/edit/${docId}`;
         deleteForm.action = `/delete/${docId}`;
 
-        // Set preview
         if (fileExt.match(/(png|jpg|jpeg|gif)/i)) {
             previewArea.innerHTML = `<img src="/view/${docId}" alt="Preview" style="max-width: 200px; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">`;
         } else if (fileExt.match(/pdf/i)) {
-            // Use a PDF icon if you have one in static/
             previewArea.innerHTML = `<img src="{{ url_for('static', filename='pdf-icon.png') }}" alt="PDF" style="width: 64px; height: 64px;"><p>PDF Document</p>`;
         } else {
             previewArea.innerHTML = `<p>No preview available</p>`;
         }
-
-        // Show modal
         modal.style.display = 'block';
     }
+
+    // --- Delete Confirmation Modal ---
+    const deleteModal = document.getElementById('deleteConfirmModal');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    let pendingDeleteId = null;
+    let pendingDeleteForm = null;
+
+    function openDeleteModal(docId, filename) {
+        document.getElementById('deleteFileName').innerText = filename;
+        pendingDeleteId = docId;
+        // Find the delete form (in the list or in edit modal)
+        const formInList = document.querySelector(`.doc-item[data-id="${docId}"] form[action*="/delete/"]`);
+        const formInModal = document.getElementById('deleteForm');
+        if (formInList) pendingDeleteForm = formInList;
+        else if (formInModal && formInModal.action.includes(`/delete/${docId}`)) pendingDeleteForm = formInModal;
+        deleteModal.style.display = 'block';
+    }
+
+    function closeDeleteModal() {
+        deleteModal.style.display = 'none';
+        pendingDeleteId = null;
+        pendingDeleteForm = null;
+    }
+
+    confirmDeleteBtn.onclick = function() {
+        if (pendingDeleteForm) {
+            pendingDeleteForm.submit();
+        } else if (pendingDeleteId) {
+            // Fallback: create a temporary form and submit
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/delete/${pendingDeleteId}`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+        closeDeleteModal();
+    }
+
+    // Intercept delete button clicks (both in list and inside edit modal)
+    document.addEventListener('click', function(e) {
+        // Look for delete button inside a form
+        const deleteBtn = e.target.closest('button')?.matches('form button') ? e.target.closest('button') : null;
+        if (!deleteBtn) return;
+        const form = deleteBtn.closest('form');
+        if (!form || !form.action.includes('/delete/')) return;
+        e.preventDefault();
+        // Get document ID from form action or from data-id on the doc-item
+        let docId = form.action.split('/').pop();
+        // Try to find the filename
+        let filename = '';
+        const docItem = document.querySelector(`.doc-item[data-id="${docId}"]`);
+        if (docItem) filename = docItem.dataset.filename;
+        openDeleteModal(docId, filename);
+    });
 </script>
 {% endblock %}

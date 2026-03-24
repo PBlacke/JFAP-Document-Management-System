@@ -180,7 +180,8 @@ def init_db():
 
     c.execute("CREATE INDEX IF NOT EXISTS idx_document_versions_doc_id ON document_versions(doc_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_documents_id ON documents(id)")  # already primary key, but explicit
-    c.execute("CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON activity_log(user_id)")       
+    c.execute("CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON activity_log(user_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp);")       
 
     conn.commit()
     conn.close()
@@ -237,11 +238,13 @@ def log_activity(user_id, action, details=''):
                       (user_id, action, details))
             conn.commit()
             conn.close()
-            print(f"[LOG] activity logged in {time.time()-start:.3f}s")
+            elapsed = time.time() - start
+            print(f"[LOG] activity logged in {elapsed:.3f}s")
             return
         except sqlite3.OperationalError as e:
             if "locked" in str(e):
                 retries -= 1
+                print(f"[LOG] database is locked, retrying... ({5 - retries}/5)")
                 time.sleep(0.1)
                 continue
             else:
@@ -439,32 +442,67 @@ def search():
 @app.route('/documents')
 @login_required
 def list_documents():
-    start = time.time()
+    # Get query parameters
+    search_term = request.args.get('q', '').strip()
+    doc_type_filter = request.args.get('type', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+
     conn = sqlite3.connect('documents.db')
     conn.execute("PRAGMA journal_mode=WAL")
     c = conn.cursor()
 
-    c.execute("""
-        SELECT d.id, d.filename, d.upload_date, d.doc_type, d.project, u.username
+    # Base query: select all documents with uploader info
+    base_sql = """
+        SELECT d.id, d.filename, d.upload_date, d.doc_type, d.project, u.username, d.user_id
         FROM documents d
         JOIN users u ON d.user_id = u.id
-        ORDER BY d.upload_date DESC
-    """)
+    """
+    where_clauses = []
+    params = []
+
+    # Search term: match filename, doc_type, project (case-insensitive)
+    if search_term:
+        where_clauses.append("(d.filename LIKE ? OR d.doc_type LIKE ? OR d.project LIKE ?)")
+        term = f"%{search_term}%"
+        params.extend([term, term, term])
+
+    # Document type filter: exact match
+    if doc_type_filter:
+        where_clauses.append("d.doc_type = ?")
+        params.append(doc_type_filter)
+
+    # Build final query
+    if where_clauses:
+        full_sql = base_sql + " WHERE " + " AND ".join(where_clauses)
+    else:
+        full_sql = base_sql
+
+    # Count total items
+    count_sql = f"SELECT COUNT(*) FROM ({full_sql})"
+    c.execute(count_sql, params)
+    total_count = c.fetchone()[0]
+
+    # Add pagination
+    offset = (page - 1) * per_page
+    paginated_sql = full_sql + " ORDER BY d.upload_date DESC LIMIT ? OFFSET ?"
+    params.extend([per_page, offset])
+    c.execute(paginated_sql, params)
     docs = c.fetchall()
-
-    query_time = time.time() - start
-    print(f"[DOCUMENTS] Query: {query_time:.3f}s for {len(docs)} documents")
-    render_start = time.time()
-    rendered = render_template('documents.html', documents=docs)
-    render_time = time.time() - render_start
-    print(f"[DOCUMENTS] Render took: {render_time:.3f}s")
-
     conn.close()
 
-    total_time = time.time() - start
-    print(f"[DOCUMENTS] TOTAL: {total_time:.3f}s")
-    return rendered
+    # Pagination calculations
+    total_pages = (total_count + per_page - 1) // per_page
+    # Ensure page is within bounds
+    page = max(1, min(page, total_pages)) if total_pages > 0 else 1
 
+    return render_template('documents.html',
+                           documents=docs,
+                           total_pages=total_pages,
+                           current_page=page,
+                           search_term=search_term,
+                           type_filter=doc_type_filter,
+                           total_count=total_count)
 #view document
 @app.route('/view/<int:doc_id>')
 @login_required
@@ -557,7 +595,7 @@ def preview_document(doc_id):
 @app.route('/edit/<int:doc_id>', methods=['POST'])
 @login_required
 def edit_document(doc_id):
-    # Get form data FIRST
+    # Get form data first
     new_filename = request.form['filename'].strip()
     doc_type = request.form.get('type', '')
     project = request.form.get('project', '')
@@ -566,6 +604,7 @@ def edit_document(doc_id):
         return "Filename can't be empty", 400
 
     conn = sqlite3.connect('documents.db')
+    conn.execute("PRAGMA journal_mode=WAL")
     c = conn.cursor()
 
     # Get current file info (including type/project)
@@ -584,11 +623,10 @@ def edit_document(doc_id):
             conn.close()
             abort(403)
 
-    # Versioning
+    # Versioning – count and insert
     c.execute("SELECT COUNT(*) FROM document_versions WHERE doc_id = ?", (doc_id,))
     count = c.fetchone()[0]
     new_version = count + 1
-
     c.execute("""INSERT INTO document_versions (doc_id, version, filename, filepath, doc_type, project, action, changed_by)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
               (doc_id, new_version, old_filename, old_filepath, old_doc_type, old_project, 'edit', current_user.id))
@@ -612,88 +650,67 @@ def edit_document(doc_id):
                  WHERE id = ?""",
               (new_filename, new_filepath, doc_type, project, doc_id))
 
-    log_activity(current_user.id, 'edit', f'Edited document "{old_filename}" to "{new_filename}", type: {doc_type}, project: {project}')
-
+    # Commit everything (version + update) before logging
     conn.commit()
     conn.close()
 
+    # Log activity AFTER commit (no lock)
+    log_activity(current_user.id, 'edit', f'Edited document "{old_filename}" to "{new_filename}", type: {doc_type}, project: {project}')
+
     return redirect(url_for('list_documents'))
+
+
 
 #delete document
 @app.route('/delete/<int:doc_id>', methods=['POST'])
 @login_required
 def delete_document(doc_id):
-    start_total = time.time()
-
     conn = sqlite3.connect('documents.db')
     conn.execute("PRAGMA journal_mode=WAL")
     c = conn.cursor()
 
-    # --- Get document info ---
-    start_fetch = time.time()
+    # Get full info
     c.execute("SELECT filename, filepath, doc_type, project, user_id FROM documents WHERE id = ?", (doc_id,))
     row = c.fetchone()
     if not row:
         conn.close()
         abort(404)
     filename, filepath, doc_type, project, owner_id = row
-    fetch_time = time.time() - start_fetch
-    print(f"[DELETE] Fetch document: {fetch_time:.3f}s")
 
-    # --- Ownership check (admin) ---
-    start_owner = time.time()
+    # Check ownership or admin
     if owner_id != current_user.id:
         c.execute("SELECT is_admin FROM users WHERE id = ?", (current_user.id,))
         admin_row = c.fetchone()
         if not admin_row or admin_row[0] != 1:
             conn.close()
             abort(403)
-    owner_time = time.time() - start_owner
-    print(f"[DELETE] Ownership check: {owner_time:.3f}s")
 
-    # --- Versioning: get count and insert ---
-    start_version_count = time.time()
+    # Versioning
     c.execute("SELECT COUNT(*) FROM document_versions WHERE doc_id = ?", (doc_id,))
     count = c.fetchone()[0]
     new_version = count + 1
-    version_count_time = time.time() - start_version_count
-    print(f"[DELETE] Version count: {version_count_time:.3f}s")
-
-    start_version_insert = time.time()
     c.execute("""INSERT INTO document_versions (doc_id, version, filename, filepath, doc_type, project, action, changed_by)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
               (doc_id, new_version, filename, filepath, doc_type, project, 'delete', current_user.id))
-    version_insert_time = time.time() - start_version_insert
-    print(f"[DELETE] Version insert: {version_insert_time:.3f}s")
 
-    # --- Log activity ---
-    start_log = time.time()
-    log_activity(current_user.id, 'delete', f'Deleted "{filename}"')
-    log_time = time.time() - start_log
-    print(f"[DELETE] log_activity: {log_time:.3f}s")
-
-    # --- Delete from database ---
-    start_delete_db = time.time()
+    # Delete from database
     c.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+
+    # Commit everything (version + delete) before logging
     conn.commit()
     conn.close()
-    delete_db_time = time.time() - start_delete_db
-    print(f"[DELETE] DB delete + commit: {delete_db_time:.3f}s")
 
-    # --- Delete file from disk ---
-    start_file_del = time.time()
+    # Log activity AFTER commit (no lock)
+    log_activity(current_user.id, 'delete', f'Deleted "{filename}"')
+
+    # Delete file
     try:
         if os.path.exists(filepath):
             os.remove(filepath)
     except Exception as e:
         print(f"Error deleting file {filepath}: {e}")
-    file_del_time = time.time() - start_file_del
-    print(f"[DELETE] File deletion: {file_del_time:.3f}s")
 
-    total = time.time() - start_total
-    print(f"[DELETE] TOTAL: {total:.3f}s")
-
-    return redirect(url_for('list_documents'))
+    return redirect(url_for('list_documents'))  
 
 
 #admin route

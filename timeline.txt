@@ -2,6 +2,21 @@
 Project: JFAP Simple Document Management System (DMS) Prototype
 
 
+Date	Milestones & Achievements
+2026‑02‑27	Project Kickoff – Built basic OCR DMS: upload (images/PDFs), text extraction with Tesseract, SQLite storage, simple search. Initial GitHub push.
+2026‑03‑02	Debugging & Documentation – Fixed typos, table creation, favicon. Added README. Started preview feature (encountered bugs).
+2026‑03‑03	Feature Completion – Finished preview (images/PDFs), edit (rename files), delete (with confirmation). Fixed SQL tuple errors, local timestamps, UI polish. Full CRUD working.
+2026‑03‑04	Advanced Search & User Auth – Integrated SQLite FTS5 with BM25 ranking, replaced LIKE search. Added user registration/login, password validation, Flask‑Login, multi‑user isolation.
+2026‑03‑05	UI Overhaul & Deployment Prep – Created base.html with navbar (profile dropdown, active highlighting), footer. Redesigned preview with details panel. Explored LAN/public deployment options.
+2026‑03‑06	Admin, Logging & Versioning – Added admin flag, @admin_required decorator, admin dashboard. Created activity_log and document_versions tables with triggers. Fixed edit/delete bugs. Polished login/register pages.
+2026‑03‑09	Performance Optimisation – Added timing logs, enabled WAL mode, created database indexes. Reduced upload time from 31s to 2s. Identified delete slowdown (redirect issue).
+2026‑03‑12	(Break) – Paused to refresh.
+2026‑03‑17	Export & Admin Tabs – Fixed Poppler path issue. Added Excel export for all documents (pandas). Created tabbed admin dashboard (Users, Documents, Activity Logs) with JavaScript switching.
+2026‑03‑18	User Approval Flow – Added approved column to users. Implemented admin approval (pending users). Login displays modal with pending message instead of plain error. Added notification dot on admin Users tab when pending users exist.
+2026‑03‑24	(Continued polish) – Refined login modal, fixed flash message display, updated CSS.
+
+
+
 🗓️ February 27, 2026 – Project Kickoff & Core Implementation
 Started building the prototype from scratch using Flask, SQLite, and Tesseract OCR.
 Implemented basic functionality:
@@ -147,3 +162,45 @@ Encountered bugs: missing doc_id in template context and SQL query errors (typo 
         Added timing to list_documents and confirmed query performance improved with new indexes.
     Encountered new bugs (unexpected behaviour in delete and list views) – decided to pause and return on Wednesday with fresh eyes.
 ✅ Outcome: The system is now significantly faster and more robust. Uploads average ~2 seconds, and document listing is near‑instant even with many records. Remaining issues noted for later resolution.
+
+
+🗓️ March 17, 2026 – Excel Export, Admin Tabs & Export Fixes
+    Fixed PDF OCR issue – Resolved the “poppler not in PATH” error by downloading Poppler and adding its bin folder to the system PATH. Verified PDF uploads now extract text correctly.
+    Added Excel export for all documents:
+        Installed pandas and openpyxl in the virtual environment.
+        Created /export-documents route (accessible to all users) that exports the full document list (filename, type, project, upload date, uploader) to an Excel file with a timestamped filename.
+        Added an “Export to Excel” button in the documents page.
+    Refactored admin dashboard with tabs:
+        Converted the single‑page admin view into a tabbed interface (Users, Documents, Activity Logs) using HTML/CSS and JavaScript.
+        Each tab shows its respective table (users, all documents, activity logs) without reloading the page.
+        Fixed a bug where tabs were not clickable – the data-tab attributes and JavaScript event listeners were correctly implemented, and the content divs were properly aligned.
+    Optimised database queries – Added missing indexes (idx_documents_user_id, idx_documents_upload_date, idx_document_versions_doc_id) to speed up document listing and version counting.
+    Miscellaneous – Ensured all database connections enable WAL mode to reduce locking.
+
+
+🗓️ March 18, 2026 – User Approval Workflow & Admin Notification
+    Implemented user approval system:
+        Added approved column to users table (default 0 = pending).
+        Modified registration to create users as pending (no email verification, offline‑friendly).
+        Updated login route to check approved status: pending users are shown a friendly flash message and redirected back to the login page.
+        Created /approve-user/<user_id> route (admin only) to set approved = 1.
+    Added modal for pending login attempts:
+        Built a custom modal in login.html that displays the flash message (e.g., “Your account is pending admin approval…”).
+        Used Jinja to pass the flash message to JavaScript and automatically open the modal on page load.
+        Styled the modal to match the application’s design.
+    Notification dot for admin dashboard:
+        In the admin route, counted pending users (SELECT COUNT(*) FROM users WHERE approved = 0).
+        Passed pending_count to the template.
+        Added a red circular dot next to the “Users” tab if pending_count > 0.
+        CSS for the dot was added (10px red circle with subtle glow).
+    Fixed flash message persistence – Ensured the modal only appears once per pending login attempt (by redirecting after flash, not staying on the same page).
+
+
+🗓️ March 24, 2026 – UI Polish & Final Tweaks
+    Refined login modal – Improved the modal’s responsiveness and ensured it closes properly when the “OK” button or close (×) is clicked.
+    Enhanced flash message handling – Used the |tojson filter in Jinja to safely escape any special characters in the message, preventing JavaScript injection.
+    Minor CSS improvements – Adjusted margins and padding on the admin tabs and the notification dot for better alignment.
+    Double‑checked file export – Verified that the Excel export works for all users and includes all document fields.
+    Testing – Confirmed that the user approval flow (pending → approved) works correctly and the admin notification dot disappears after all pending users are approved.
+
+
